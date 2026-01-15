@@ -1,0 +1,55 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Deploy to server via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: "dist/*"
+          target: ${{ secrets.SERVER_PATH || '/var/www/html' }}
+          strip_components: 1
+          rm: true
+
+      - name: Set permissions on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            chown -R www-data:www-data ${{ secrets.SERVER_PATH || '/var/www/html' }}
+            chmod -R 755 ${{ secrets.SERVER_PATH || '/var/www/html' }}
+            systemctl reload apache2 || true
