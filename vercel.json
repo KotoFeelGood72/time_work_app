@@ -2,6 +2,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/install",
+      "destination": "/install.html"
+    },
+    {
       "source": "/((?!install\\.html|favicon\\.ico|.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)).*)",
       "destination": "/index.html"
     }
