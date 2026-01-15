@@ -1,0 +1,29 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Обработка OPTIONS запросов (preflight для CORS)
+  RewriteCond %{REQUEST_METHOD} OPTIONS
+  RewriteRule ^(.*)$ $1 [R=200,L]
+
+  # Разрешаем доступ к статическим файлам
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/install\.html$
+  
+  # Перенаправляем все остальные запросы на index.html
+  RewriteRule ^(.*)$ /index.html [L,QSA]
+</IfModule>
+
+# Разрешаем CORS для всех методов
+<IfModule mod_headers.c>
+  Header always set Access-Control-Allow-Origin "*"
+  Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD"
+  Header always set Access-Control-Allow-Headers "X-Requested-With, Content-Type, Accept, Authorization, Origin"
+  Header always set Access-Control-Allow-Credentials "true"
+  
+  # Для OPTIONS запросов возвращаем 200 без тела
+  <If "%{REQUEST_METHOD} == 'OPTIONS'">
+    Header always set Content-Length "0"
+  </If>
+</IfModule>
