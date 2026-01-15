@@ -2,7 +2,7 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!install\\.html|favicon\\.ico|.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)).*)",
       "destination": "/index.html"
     }
   ],
