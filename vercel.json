@@ -5,7 +5,7 @@
       "destination": "/install.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!install\\.html|.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|html)).*)",
       "destination": "/index.html"
     }
   ],
