@@ -1,6 +1,6 @@
 <template>
   <div>
-    HomeView
+    TheHeader
   </div>
 </template>
 

@@ -1,6 +1,6 @@
 <template>
   <div>
-    HomeView
+    TheFooter
   </div>
 </template>
 
