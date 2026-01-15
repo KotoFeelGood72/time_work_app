@@ -1,8 +1,13 @@
 {
+  "functions": {
+    "api/install/index.js": {
+      "maxDuration": 10
+    }
+  },
   "rewrites": [
     {
       "source": "/install.php",
-      "destination": "/api/install.php"
+      "destination": "/api/install"
     },
     {
       "source": "/install",

@@ -1,16 +1,20 @@
-export default function handler(req: any, res: any) {
-  // Устанавливаем CORS заголовки
+export default async function handler(req, res) {
+  // Устанавливаем CORS заголовки для всех методов
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, PATCH, HEAD')
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Authorization, Origin')
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
 
-  // Обработка preflight запросов
+  // Обработка preflight запросов (OPTIONS)
   if (req.method === 'OPTIONS') {
+    res.setHeader('Content-Length', '0')
     return res.status(200).end()
   }
 
-  // Возвращаем HTML страницу установки
-  const html = `<!DOCTYPE html>
+  // Обрабатываем GET и POST запросы
+  if (req.method === 'GET' || req.method === 'POST') {
+    // Возвращаем HTML страницу установки
+    const html = `<!DOCTYPE html>
 <html>
     <head>
         <meta charset="utf-8">
@@ -45,6 +49,10 @@ export default function handler(req: any, res: any) {
     </body>
 </html>`
 
-  res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  res.status(200).send(html)
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    return res.status(200).send(html)
+  }
+
+  // Для других методов возвращаем 405
+  res.status(405).json({ error: 'Method Not Allowed' })
 }
