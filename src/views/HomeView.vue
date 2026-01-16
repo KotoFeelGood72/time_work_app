@@ -67,7 +67,8 @@
             <td
               v-for="day in daysInMonth"
               :key="day.date"
-              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600"
+              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              @click="openDayDetails(employee, day.date)"
             >
               <div
                 v-if="getTimeEntry(employee, day.date)"
@@ -79,6 +80,12 @@
                 ]"
               >
                 {{ formatTime(getTimeEntry(employee, day.date)!) }}
+              </div>
+              <div
+                v-else
+                class="w-full h-full min-h-[24px] flex items-center justify-center"
+              >
+                <span class="text-gray-300 dark:text-gray-600 text-xs">—</span>
               </div>
             </td>
             <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-50 dark:bg-gray-700">
@@ -98,7 +105,7 @@
               >
                 <div v-if="getDailyTotal(day.date)" class="font-semibold">
                   {{ formatTime(getDailyTotal(day.date)!) }}
-                </div>
+        </div>
               </td>
               <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs bg-yellow-100 dark:bg-yellow-900 font-bold sticky right-0 z-30">
                 {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
@@ -140,6 +147,16 @@
       @close="closeDepartmentModal"
       @select="handleDepartmentSelect"
     />
+
+    <!-- Модальное окно деталей дня -->
+    <DayDetailsModal
+      :is-open="isDayDetailsModalOpen"
+      :employee-id="selectedDayData?.employeeId || ''"
+      :employee-code="selectedDayData?.employeeCode || ''"
+      :employee-name="selectedDayData?.employeeName || ''"
+      :date="selectedDayData?.date || ''"
+      @close="closeDayDetailsModal"
+    />
   </div>
 </template>
 
@@ -148,6 +165,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { fetchTimesheet, fetchDepartments } from '@/api/timesheet/api'
 import type { TimesheetData, Department, TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
 import DepartmentModal from '@/components/dashboard/DepartmentModal.vue'
+import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
 import DatePicker from '@/components/dashboard/DatePicker.vue'
 
 const loading = ref(false)
@@ -167,6 +185,14 @@ const selectedDepartment = ref<Department | null>(null)
 const isDepartmentModalOpen = ref(false)
 const selectedEmployeeId = ref<string | null>(null)
 const showEmpty = ref(false)
+
+const isDayDetailsModalOpen = ref(false)
+const selectedDayData = ref<{
+  employeeId: string
+  employeeCode: string
+  employeeName: string
+  date: string
+} | null>(null)
 
 const currentMonth = ref(new Date().getMonth() + 1)
 const currentYear = ref(new Date().getFullYear())
@@ -320,6 +346,21 @@ const refreshData = () => {
 const toggleShowEmpty = () => {
   showEmpty.value = !showEmpty.value
   // Логика показа пустых строк
+}
+
+const openDayDetails = (employee: EmployeeTimeData, date: string) => {
+  selectedDayData.value = {
+    employeeId: employee.employeeId,
+    employeeCode: employee.employeeCode,
+    employeeName: employee.employeeName,
+    date,
+  }
+  isDayDetailsModalOpen.value = true
+}
+
+const closeDayDetailsModal = () => {
+  isDayDetailsModalOpen.value = false
+  selectedDayData.value = null
 }
 
 watch([currentMonth, currentYear], () => {
