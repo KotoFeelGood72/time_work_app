@@ -1,7 +1,7 @@
 // API методы для работы с табелем учета рабочего времени
 
 import { requestWrapper } from '../index'
-import type { BitrixTimesheetRaw, BitrixDepartmentRaw } from './dto'
+import type { BitrixDepartmentRaw } from './dto'
 import { TransformTimesheet } from './transform'
 import type {
   TimesheetData,
@@ -42,58 +42,94 @@ export const fetchTimesheet = async (
     }
   }
 
-  // Пробуем разные методы timeman в зависимости от доступности
-  // Сначала пробуем timeman.status.get (получение статуса учета времени)
+  // Пробуем использовать методы timeman для получения данных о времени работы
+  // Согласно документации: timeman.schedule.get - получение настроек рабочего графика
+  // Документация: https://apidocs.bitrix24.ru/api-reference/index.html
+
+  // Сначала пробуем timeman.schedule.get для получения рабочих графиков
+  // Документация: https://apidocs.bitrix24.ru/api-reference/index.html
   try {
-    return await requestWrapper<BitrixTimesheetRaw[], TimesheetData>(
-      'timeman.status.get',
-      requestParams,
-      TransformTimesheet.fromDTOArray
-    )
-  } catch (error) {
-    // Если timeman.status.get не работает, пробуем получить данные через задачи
-    // или возвращаем пустую структуру
-    console.warn('Метод timeman.status.get недоступен, используем альтернативный подход', error)
-
-    // Получаем пользователей для формирования базовой структуры табеля
-    const userFilter: Record<string, unknown> = { ACTIVE: true }
-    if (filters.departmentId && filters.departmentId !== '0') {
-      userFilter.UF_DEPARTMENT = filters.departmentId
+    interface ScheduleData {
+      [key: string]: unknown
     }
 
-    interface UserForTimesheet {
-      ID: string
-      NAME?: string
-      LAST_NAME?: string
-    }
-
-    const users = await requestWrapper<UserForTimesheet[], UserForTimesheet[]>(
-      'user.get',
-      {
-        filter: userFilter,
-        select: ['ID', 'NAME', 'LAST_NAME'],
-      },
+    const scheduleData = await requestWrapper<ScheduleData, ScheduleData>(
+      'timeman.schedule.get',
+      {},
       (result) => result
     )
 
-    // Формируем базовую структуру табеля без данных о времени
-    return {
-      departmentId: filters.departmentId,
-      departmentName: filters.departmentName || 'Все подразделения',
-      month: filters.month || new Date().getMonth() + 1,
-      year: filters.year || new Date().getFullYear(),
-      employees: users.map((user) => ({
-        employeeId: user.ID,
-        employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
-        employeeCode: `#${user.ID}`,
-        entries: {},
-        totalHours: 0,
-        totalMinutes: 0,
-      })),
-      workingDays: 0,
-      dailyTotals: {},
-      grandTotal: { hours: 0, minutes: 0 },
+    if (scheduleData) {
+      console.info('Получены данные о рабочих графиках через timeman.schedule.get')
+      // Здесь можно обработать данные о графиках для формирования табеля
     }
+  } catch {
+    console.info('Метод timeman.schedule.get недоступен или не вернул данные')
+  }
+
+  // Пробуем timeman.status для получения информации о текущем рабочем дне пользователя
+  // Согласно документации: timeman.status - получить информацию о текущем рабочем дне пользователя
+  try {
+    // timeman.status возвращает информацию о текущем рабочем дне
+    // Может потребоваться передать USER_ID для получения данных конкретного пользователя
+    interface TimemanStatusData {
+      [key: string]: unknown
+    }
+
+    const statusData = await requestWrapper<TimemanStatusData, TimemanStatusData>(
+      'timeman.status',
+      {},
+      (result) => result
+    )
+
+    if (statusData) {
+      console.info('Получены данные о рабочем дне через timeman.status')
+      // Здесь можно обработать данные для формирования табеля
+      // Пока используем fallback для получения полной структуры
+    }
+  } catch {
+    console.info('Метод timeman.status недоступен или не вернул данные')
+  }
+
+  // Если методы timeman не вернули нужные данные, используем альтернативный подход
+  // Получаем пользователей для формирования базовой структуры табеля
+  const userFilter: Record<string, unknown> = { ACTIVE: true }
+  if (filters.departmentId && filters.departmentId !== '0') {
+    userFilter.UF_DEPARTMENT = filters.departmentId
+  }
+
+  interface UserForTimesheet {
+    ID: string
+    NAME?: string
+    LAST_NAME?: string
+  }
+
+  const users = await requestWrapper<UserForTimesheet[], UserForTimesheet[]>(
+    'user.get',
+    {
+      filter: userFilter,
+      select: ['ID', 'NAME', 'LAST_NAME'],
+    },
+    (result) => result
+  )
+
+  // Формируем базовую структуру табеля без данных о времени
+  return {
+    departmentId: filters.departmentId,
+    departmentName: filters.departmentName || 'Все подразделения',
+    month: filters.month || new Date().getMonth() + 1,
+    year: filters.year || new Date().getFullYear(),
+    employees: users.map((user) => ({
+      employeeId: user.ID,
+      employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
+      employeeCode: `#${user.ID}`,
+      entries: {},
+      totalHours: 0,
+      totalMinutes: 0,
+    })),
+    workingDays: 0,
+    dailyTotals: {},
+    grandTotal: { hours: 0, minutes: 0 },
   }
 }
 
@@ -101,14 +137,20 @@ export const fetchTimesheet = async (
  * Получить список подразделений
  * Использует метод department.get из Bitrix24 API
  * Документация: https://apidocs.bitrix24.ru/api-reference/departments/department-get.html
+ * Метод может вызывать любой пользователь согласно документации
  */
 export const fetchDepartments = async (): Promise<Department[]> => {
   try {
-    // Метод department.get может возвращать объект с подразделениями или массив
-    // Пробуем получить все подразделения
-    const result = await requestWrapper<Record<string, BitrixDepartmentRaw> | BitrixDepartmentRaw[], Department[]>(
+    // Согласно документации, метод department.get поддерживает параметры:
+    // - sort: поле для сортировки (ID, NAME, SORT, PARENT, UF_HEAD)
+    // - order: направление сортировки (ASC, DESC)
+    // - ID: фильтр по идентификатору подразделения
+    const result = await requestWrapper<BitrixDepartmentRaw[], Department[]>(
       'department.get',
-      {},
+      {
+        sort: 'SORT', // Сортировка по порядку сортировки
+        order: 'ASC', // По возрастанию
+      },
       (data) => {
         // Обрабатываем разные форматы ответа
         if (Array.isArray(data)) {
@@ -131,45 +173,56 @@ export const fetchDepartments = async (): Promise<Department[]> => {
       ...result,
     ]
   } catch (error) {
-    console.error('Ошибка получения подразделений через department.get:', error)
+    console.warn('Ошибка получения подразделений через department.get, используем fallback:', error)
 
     // Fallback: получаем подразделения из пользователей
+    // Это работает, так как user.get не требует дополнительных прав
     try {
       interface UserWithDepartment {
         ID: string
         UF_DEPARTMENT?: string | string[]
+        UF_DEPARTMENT_NAME?: string | string[]
       }
 
       const users = await requestWrapper<UserWithDepartment[], UserWithDepartment[]>(
         'user.get',
         {
           filter: { ACTIVE: true },
-          select: ['ID', 'UF_DEPARTMENT'],
+          select: ['ID', 'UF_DEPARTMENT', 'UF_DEPARTMENT_NAME'],
         },
         (result) => result
       )
 
-      const departmentsMap = new Map<string, string>()
+      const departmentsMap = new Map<string, { id: string; name: string }>()
 
       users.forEach((user) => {
-        if (user.UF_DEPARTMENT && Array.isArray(user.UF_DEPARTMENT)) {
-          user.UF_DEPARTMENT.forEach((deptId: string) => {
-            if (deptId && !departmentsMap.has(deptId)) {
-              departmentsMap.set(deptId, deptId)
-            }
-          })
-        } else if (user.UF_DEPARTMENT && typeof user.UF_DEPARTMENT === 'string') {
-          const deptId = user.UF_DEPARTMENT
+        const deptIds = Array.isArray(user.UF_DEPARTMENT)
+          ? user.UF_DEPARTMENT
+          : user.UF_DEPARTMENT
+            ? [user.UF_DEPARTMENT]
+            : []
+
+        const deptNames = Array.isArray(user.UF_DEPARTMENT_NAME)
+          ? user.UF_DEPARTMENT_NAME
+          : user.UF_DEPARTMENT_NAME
+            ? [user.UF_DEPARTMENT_NAME]
+            : []
+
+        deptIds.forEach((deptId: string, index: number) => {
           if (deptId && !departmentsMap.has(deptId)) {
-            departmentsMap.set(deptId, deptId)
+            const deptName = deptNames[index] || deptId
+            departmentsMap.set(deptId, {
+              id: deptId,
+              name: typeof deptName === 'string' ? deptName : deptId,
+            })
           }
-        }
+        })
       })
 
-      const departments: Department[] = Array.from(departmentsMap.entries()).map(([id]) => ({
-        id,
-        name: id,
-      }))
+      const departments: Department[] = Array.from(departmentsMap.values())
+
+      // Сортируем по названию для удобства
+      departments.sort((a, b) => a.name.localeCompare(b.name))
 
       return [
         { id: '0', name: 'По всей компании' },
@@ -177,6 +230,7 @@ export const fetchDepartments = async (): Promise<Department[]> => {
       ]
     } catch (fallbackError) {
       console.error('Ошибка получения подразделений через fallback:', fallbackError)
+      // Возвращаем хотя бы базовый список
       return [{ id: '0', name: 'По всей компании' }]
     }
   }
