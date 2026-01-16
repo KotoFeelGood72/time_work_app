@@ -32,11 +32,10 @@
 
     <!-- Компактная таблица -->
     <div v-if="!loading && !error" class="compact-table-wrapper">
-      <div class="overflow-x-auto overflow-y-auto compact-table-scroll">
-        <table class="compact-timesheet-table w-full border-collapse bg-white dark:bg-gray rounded-lg overflow-hidden text-sm">
-          <thead class="sticky top-0 z-20">
+      <table class="compact-timesheet-table w-full border-collapse bg-white dark:bg-gray rounded-lg overflow-hidden text-sm">
+        <thead>
             <tr class="bg-gray-100 dark:bg-gray-800">
-              <th class="px-2 py-1.5 text-left border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-30 min-w-[140px]">
+              <th class="px-2 py-1.5 text-left border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-40 min-w-[140px]">
                 ФИО сотрудника
               </th>
               <th
@@ -47,7 +46,7 @@
                 <div class="leading-tight">{{ day.day }}</div>
                 <div class="text-10 text-gray-600 dark:text-gray-400 leading-tight">{{ day.dayName }}</div>
               </th>
-              <th class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-100 dark:bg-gray-800 min-w-[60px] sticky right-0 z-30">
+              <th class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-100 dark:bg-gray-800 min-w-[60px] sticky right-0 z-40">
                 Итого
               </th>
             </tr>
@@ -57,17 +56,17 @@
             v-for="employee in timesheetData.employees"
             :key="employee.employeeId"
             :class="[
-              'hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
+              'group transition-colors',
               selectedEmployeeId === employee.employeeId ? 'bg-yellow-100 dark:bg-yellow-900' : ''
             ]"
           >
-            <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white font-medium text-xs sticky left-0 bg-white dark:bg-gray z-10">
+            <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white font-medium text-xs sticky left-0 bg-white dark:bg-gray z-20 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 transition-colors">
               <div class="whitespace-nowrap">{{ employee.employeeCode }} {{ employee.employeeName }}</div>
             </td>
             <td
               v-for="day in daysInMonth"
               :key="day.date"
-              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 transition-colors"
               @click="openDayDetails(employee, day.date)"
             >
               <div
@@ -86,16 +85,16 @@
                 class="w-full h-full min-h-[24px] flex items-center justify-center"
               >
                 <span class="text-gray-300 dark:text-gray-600 text-xs">—</span>
-              </div>
+        </div>
             </td>
-            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-50 dark:bg-gray-700">
+            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-50 dark:bg-gray-700 sticky right-0 z-20 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 transition-colors">
               {{ formatTotalTime(employee.totalHours, employee.totalMinutes) }}
             </td>
           </tr>
           <!-- Итоговая строка -->
-          <tfoot class="sticky bottom-0 z-20">
+          <tfoot class="sticky bottom-0 z-30">
             <tr class="bg-gray-100 dark:bg-gray-800 font-bold">
-              <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-30">
+              <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-40">
                 <div class="text-xs">ИТОГО: {{ timesheetData.workingDays }} дн.</div>
               </td>
               <td
@@ -105,16 +104,15 @@
               >
                 <div v-if="getDailyTotal(day.date)" class="font-semibold">
                   {{ formatTime(getDailyTotal(day.date)!) }}
-        </div>
+      </div>
               </td>
-              <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs bg-yellow-100 dark:bg-yellow-900 font-bold sticky right-0 z-30">
+              <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs bg-yellow-100 dark:bg-yellow-900 font-bold sticky right-0 z-40">
                 {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
               </td>
             </tr>
           </tfoot>
         </tbody>
       </table>
-      </div>
     </div>
 
     <!-- Кнопки действий -->
@@ -155,6 +153,7 @@
       :employee-code="selectedDayData?.employeeCode || ''"
       :employee-name="selectedDayData?.employeeName || ''"
       :date="selectedDayData?.date || ''"
+      :time-entry="selectedDayData?.timeEntry"
       @close="closeDayDetailsModal"
     />
   </div>
@@ -192,6 +191,7 @@ const selectedDayData = ref<{
   employeeCode: string
   employeeName: string
   date: string
+  timeEntry?: TimeEntry
 } | null>(null)
 
 const currentMonth = ref(new Date().getMonth() + 1)
@@ -349,11 +349,13 @@ const toggleShowEmpty = () => {
 }
 
 const openDayDetails = (employee: EmployeeTimeData, date: string) => {
+  const timeEntry = getTimeEntry(employee, date)
   selectedDayData.value = {
     employeeId: employee.employeeId,
     employeeCode: employee.employeeCode,
     employeeName: employee.employeeName,
     date,
+    timeEntry: timeEntry || undefined,
   }
   isDayDetailsModalOpen.value = true
 }
@@ -375,21 +377,17 @@ onMounted(() => {
 
 <style scoped>
 .compact-table-wrapper {
-  height: calc(100vh - 300px);
-  display: flex;
-  flex-direction: column;
-}
-
-.compact-table-scroll {
-  flex: 1;
+  max-height: 70vh;
   overflow: auto;
-  max-height: 100%;
+  position: relative;
 }
 
 .compact-timesheet-table {
   font-size: 0.75rem;
   line-height: 1.2;
-  position: relative;
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
 }
 
 .compact-timesheet-table th,
@@ -401,30 +399,32 @@ onMounted(() => {
 .compact-timesheet-table thead {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 30;
 }
 
 .compact-timesheet-table thead th {
-  background-color: rgb(243 244 246);
+  background-color: rgb(243 244 246) !important;
+  position: relative;
 }
 
 .dark .compact-timesheet-table thead th {
-  background-color: rgb(31 41 55);
+  background-color: rgb(31 41 55) !important;
 }
 
 /* Закрепление footer */
 .compact-timesheet-table tfoot {
   position: sticky;
   bottom: 0;
-  z-index: 20;
+  z-index: 30;
 }
 
 .compact-timesheet-table tfoot td {
-  background-color: rgb(243 244 246);
+  background-color: rgb(243 244 246) !important;
+  position: relative;
 }
 
 .dark .compact-timesheet-table tfoot td {
-  background-color: rgb(31 41 55);
+  background-color: rgb(31 41 55) !important;
 }
 
 .compact-timesheet-table tfoot td.bg-yellow-100 {
@@ -444,6 +444,33 @@ onMounted(() => {
   vertical-align: middle;
 }
 
+/* Улучшенный hover-эффект для ячеек */
+.compact-timesheet-table tbody td:hover {
+  background-color: rgb(229 231 235) !important;
+}
+
+.dark .compact-timesheet-table tbody td:hover {
+  background-color: rgb(55 65 81) !important;
+}
+
+/* Hover для строки */
+.compact-timesheet-table tbody tr:hover td {
+  background-color: rgb(243 244 246) !important;
+}
+
+.dark .compact-timesheet-table tbody tr:hover td {
+  background-color: rgb(55 65 81) !important;
+}
+
+/* Сохраняем фон для sticky ячеек при hover */
+.compact-timesheet-table tbody tr:hover td.sticky {
+  background-color: rgb(243 244 246) !important;
+}
+
+.dark .compact-timesheet-table tbody tr:hover td.sticky {
+  background-color: rgb(55 65 81) !important;
+}
+
 /* Компактные стили для ячеек с временем */
 .compact-timesheet-table .time-badge {
   font-size: 0.7rem;
@@ -451,26 +478,43 @@ onMounted(() => {
   line-height: 1.2;
 }
 
+/* Убеждаемся, что sticky элементы имеют правильный фон */
+.compact-timesheet-table thead th.sticky {
+  background-color: rgb(243 244 246) !important;
+}
+
+.dark .compact-timesheet-table thead th.sticky {
+  background-color: rgb(31 41 55) !important;
+}
+
+.compact-timesheet-table tfoot td.sticky {
+  background-color: rgb(243 244 246) !important;
+}
+
+.dark .compact-timesheet-table tfoot td.sticky {
+  background-color: rgb(31 41 55) !important;
+}
+
 /* Улучшенная прокрутка */
-.compact-table-scroll::-webkit-scrollbar {
+.compact-table-wrapper::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.compact-table-scroll::-webkit-scrollbar-track {
+.compact-table-wrapper::-webkit-scrollbar-track {
   background: rgb(243 244 246);
 }
 
-.dark .compact-table-scroll::-webkit-scrollbar-track {
+.dark .compact-table-wrapper::-webkit-scrollbar-track {
   background: rgb(31 41 55);
 }
 
-.compact-table-scroll::-webkit-scrollbar-thumb {
+.compact-table-wrapper::-webkit-scrollbar-thumb {
   background: rgb(156 163 175);
   border-radius: 4px;
 }
 
-.compact-table-scroll::-webkit-scrollbar-thumb:hover {
+.compact-table-wrapper::-webkit-scrollbar-thumb:hover {
   background: rgb(107 114 128);
 }
 </style>

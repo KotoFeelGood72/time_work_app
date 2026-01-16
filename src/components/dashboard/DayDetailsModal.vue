@@ -105,12 +105,19 @@ interface TaskWithTime extends Task {
   project?: string
 }
 
+interface TimeEntry {
+  date: string
+  hours: number
+  minutes: number
+}
+
 const props = defineProps<{
   isOpen: boolean
   employeeId: string
   employeeCode: string
   employeeName: string
   date: string
+  timeEntry?: TimeEntry
 }>()
 
 const emit = defineEmits<{
@@ -171,11 +178,9 @@ const loadTasks = async () => {
       order: { CREATED_DATE: 'DESC' },
     })
 
-    // Фильтруем задачи по дате (если есть CREATED_DATE или DEADLINE в выбранном диапазоне)
+    // Фильтруем задачи по дате (если есть CREATED_DATE в выбранном диапазоне)
     const selectedDate = new Date(props.date)
     selectedDate.setHours(0, 0, 0, 0)
-    const nextDate = new Date(selectedDate)
-    nextDate.setDate(nextDate.getDate() + 1)
 
     const tasksForDate = fetchedTasks.filter((task) => {
       if (task.createdDate) {
@@ -187,20 +192,32 @@ const loadTasks = async () => {
     })
 
     // Преобразуем задачи и добавляем время
-    // В реальном приложении время должно приходить из API учета времени
-    // Пока используем моковые данные или распределяем общее время равномерно
-    const tasksWithTime: TaskWithTime[] = fetchedTasks.map((task, index) => {
-      // Временная логика: распределяем время равномерно или используем данные из табеля
-      // В реальном приложении нужно получать время из API учета времени
-      const hours = index === 0 ? 6 : index === 1 ? 2 : 8
-      const minutes = 0
+    // Используем время из табеля, если оно есть, иначе распределяем равномерно
+    const totalTimeMinutes = props.timeEntry
+      ? props.timeEntry.hours * 60 + props.timeEntry.minutes
+      : 8 * 60 // По умолчанию 8 часов
+
+    const tasksWithTime: TaskWithTime[] = tasksForDate.map((task, index) => {
+      // Распределяем время равномерно между задачами
+      const totalTasks = tasksForDate.length
+      const baseMinutes = totalTasks > 0 ? Math.floor(totalTimeMinutes / totalTasks) : 0
+      const minutes = index < totalTasks - 1 ? baseMinutes : totalTimeMinutes - (baseMinutes * (totalTasks - 1))
+      const hours = Math.floor(minutes / 60)
+      const remainingMinutes = minutes % 60
 
       return {
         ...task,
         hours,
-        minutes,
-        project: 'promkuban', // В реальном приложении получать из задачи
+        minutes: remainingMinutes,
+        project: 'promkuban', // В реальном приложении получать из задачи (GROUP_ID или UF_CRM_TASK)
       }
+    })
+
+    // Сортируем по времени (от большего к меньшему)
+    tasksWithTime.sort((a, b) => {
+      const aTotal = a.hours * 60 + a.minutes
+      const bTotal = b.hours * 60 + b.minutes
+      return bTotal - aTotal
     })
 
     tasks.value = tasksWithTime
