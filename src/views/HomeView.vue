@@ -2,12 +2,10 @@
   <div class="home-view min-h-screen bg-white dark:bg-dark transition-colors duration-300 pt-20 px-4 pb-8">
     <!-- Фильтры -->
     <div class="flex items-center gap-4 mb-6 flex-wrap">
-      <button
-        @click="openDatePicker"
-        class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
-      >
-        {{ formattedDate }}
-      </button>
+      <DatePicker
+        v-model="dateFilter"
+        @update:model-value="handleDateChange"
+      />
 
       <button
         @click="openDepartmentModal"
@@ -80,7 +78,7 @@
                 ]"
               >
                 {{ formatTime(getTimeEntry(employee, day.date)!) }}
-              </div>
+        </div>
             </td>
             <td class="px-4 py-3 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold bg-gray-50 dark:bg-gray-700">
               {{ formatTotalTime(employee.totalHours, employee.totalMinutes) }}
@@ -98,7 +96,7 @@
             >
               <div v-if="getDailyTotal(day.date)">
                 {{ formatTime(getDailyTotal(day.date)!) }}
-              </div>
+      </div>
             </td>
             <td class="px-4 py-3 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white bg-yellow-100 dark:bg-yellow-900">
               {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
@@ -146,6 +144,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { fetchTimesheet, fetchDepartments } from '@/api/timesheet/api'
 import type { TimesheetData, Department, TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
 import DepartmentModal from '@/components/dashboard/DepartmentModal.vue'
+import DatePicker from '@/components/dashboard/DatePicker.vue'
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -168,12 +167,15 @@ const showEmpty = ref(false)
 const currentMonth = ref(new Date().getMonth() + 1)
 const currentYear = ref(new Date().getFullYear())
 
-const formattedDate = computed(() => {
-  const monthNames = [
-    'ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН',
-    'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'
-  ]
-  return `${monthNames[currentMonth.value - 1]} ${currentYear.value}`
+const dateFilter = computed({
+  get: () => ({
+    month: currentMonth.value,
+    year: currentYear.value,
+  }),
+  set: (value: { month: number; year: number }) => {
+    currentMonth.value = value.month
+    currentYear.value = value.year
+  },
 })
 
 const daysInMonth = computed(() => {
@@ -208,11 +210,11 @@ const loadTimesheet = async () => {
       }
 
       if (windowWithBX24.BX24) {
-        await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve) => {
           windowWithBX24.BX24!.init(() => {
-            resolve()
-          })
+          resolve()
         })
+      })
       }
     }
 
@@ -284,24 +286,9 @@ const formatTotalTime = (hours: number, minutes: number): string => {
   return `${h}:${m.toString().padStart(2, '0')}`
 }
 
-const openDatePicker = () => {
-  // Простая реализация выбора месяца/года
-  const month = prompt('Введите месяц (1-12):', currentMonth.value.toString())
-  const year = prompt('Введите год:', currentYear.value.toString())
-
-  if (month) {
-    const monthNum = parseInt(month, 10)
-    if (monthNum >= 1 && monthNum <= 12) {
-      currentMonth.value = monthNum
-    }
-  }
-
-  if (year) {
-    const yearNum = parseInt(year, 10)
-    if (yearNum > 2000 && yearNum < 2100) {
-      currentYear.value = yearNum
-    }
-  }
+const handleDateChange = (value: { month: number; year: number }) => {
+  currentMonth.value = value.month
+  currentYear.value = value.year
 }
 
 const openDepartmentModal = () => {

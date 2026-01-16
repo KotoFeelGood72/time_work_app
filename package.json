@@ -17,7 +17,9 @@
   },
   "dependencies": {
     "@bitrix24/b24jssdk": "^0.5.1",
+    "@vuepic/vue-datepicker": "^12.1.0",
     "@vueuse/core": "^14.1.0",
+    "date-fns": "^4.1.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
