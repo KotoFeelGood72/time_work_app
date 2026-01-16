@@ -122,9 +122,10 @@ export const createBitrix24Mock = () => {
       for (let i = 0; i < 5; i++) {
         const date = new Date(today)
         date.setDate(date.getDate() - i)
+        const user = mockUsers[i % mockUsers.length]
         records.push({
           ID: String(i + 1),
-          USER_ID: mockUsers[i % mockUsers.length].ID,
+          USER_ID: user?.ID || mockUsers[0]?.ID || '',
           DATE_START: date.toISOString().split('T')[0],
           TIME_START: '09:00',
           TIME_FINISH: '18:00',
