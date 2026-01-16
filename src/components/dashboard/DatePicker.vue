@@ -12,7 +12,7 @@
       class="absolute top-full left-0 mt-2 z-50 bg-white dark:bg-gray rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 p-4"
       @click.stop
     >
-      <DatePickerLib
+      <VueDatePicker
         v-model="selectedDate"
         :locale="locale"
         month-picker
@@ -28,7 +28,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import DatePickerLib from '@vuepic/vue-datepicker'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { ru } from 'date-fns/locale'
 

@@ -90,10 +90,12 @@ export const TransformTimesheet = {
     // Нормализуем итоги по дням
     Object.keys(dailyTotals).forEach((date) => {
       const total = dailyTotals[date]
-      const totalMinutes = total.minutes + total.hours * 60
-      dailyTotals[date] = {
-        hours: Math.floor(totalMinutes / 60),
-        minutes: totalMinutes % 60,
+      if (total) {
+        const totalMinutes = total.minutes + total.hours * 60
+        dailyTotals[date] = {
+          hours: Math.floor(totalMinutes / 60),
+          minutes: totalMinutes % 60,
+        }
       }
     })
 
