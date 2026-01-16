@@ -100,13 +100,85 @@ export const fetchTimesheet = async (
 /**
  * Получить список подразделений
  * Использует метод department.get из Bitrix24 API
- * Документация: https://apidocs.bitrix24.ru/api-reference/index.html
+ * Документация: https://apidocs.bitrix24.ru/api-reference/departments/department-get.html
  */
 export const fetchDepartments = async (): Promise<Department[]> => {
-  return requestWrapper<BitrixDepartmentRaw[], Department[]>(
-    'department.get',
-    {},
-    TransformTimesheet.departmentsFromDTO
-  )
+  try {
+    // Метод department.get может возвращать объект с подразделениями или массив
+    // Пробуем получить все подразделения
+    const result = await requestWrapper<Record<string, BitrixDepartmentRaw> | BitrixDepartmentRaw[], Department[]>(
+      'department.get',
+      {},
+      (data) => {
+        // Обрабатываем разные форматы ответа
+        if (Array.isArray(data)) {
+          return TransformTimesheet.departmentsFromDTO(data)
+        } else if (typeof data === 'object' && data !== null) {
+          // Если ответ - объект, преобразуем его в массив
+          const departmentsArray = Object.values(data).filter(
+            (item): item is BitrixDepartmentRaw =>
+              typeof item === 'object' && item !== null && 'ID' in item && 'NAME' in item
+          )
+          return TransformTimesheet.departmentsFromDTO(departmentsArray)
+        }
+        return []
+      }
+    )
+
+    // Добавляем опцию "По всей компании" в начало списка
+    return [
+      { id: '0', name: 'По всей компании' },
+      ...result,
+    ]
+  } catch (error) {
+    console.error('Ошибка получения подразделений через department.get:', error)
+
+    // Fallback: получаем подразделения из пользователей
+    try {
+      interface UserWithDepartment {
+        ID: string
+        UF_DEPARTMENT?: string | string[]
+      }
+
+      const users = await requestWrapper<UserWithDepartment[], UserWithDepartment[]>(
+        'user.get',
+        {
+          filter: { ACTIVE: true },
+          select: ['ID', 'UF_DEPARTMENT'],
+        },
+        (result) => result
+      )
+
+      const departmentsMap = new Map<string, string>()
+
+      users.forEach((user) => {
+        if (user.UF_DEPARTMENT && Array.isArray(user.UF_DEPARTMENT)) {
+          user.UF_DEPARTMENT.forEach((deptId: string) => {
+            if (deptId && !departmentsMap.has(deptId)) {
+              departmentsMap.set(deptId, deptId)
+            }
+          })
+        } else if (user.UF_DEPARTMENT && typeof user.UF_DEPARTMENT === 'string') {
+          const deptId = user.UF_DEPARTMENT
+          if (deptId && !departmentsMap.has(deptId)) {
+            departmentsMap.set(deptId, deptId)
+          }
+        }
+      })
+
+      const departments: Department[] = Array.from(departmentsMap.entries()).map(([id]) => ({
+        id,
+        name: id,
+      }))
+
+      return [
+        { id: '0', name: 'По всей компании' },
+        ...departments,
+      ]
+    } catch (fallbackError) {
+      console.error('Ошибка получения подразделений через fallback:', fallbackError)
+      return [{ id: '0', name: 'По всей компании' }]
+    }
+  }
 }
 
