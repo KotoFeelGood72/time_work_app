@@ -1,7 +1,7 @@
 // API методы для работы с табелем учета рабочего времени
 
 import { requestWrapper } from '../index'
-import type { BitrixDepartmentRaw } from './dto'
+import type { BitrixDepartmentRaw, TimemanStatusData } from './dto'
 import { TransformTimesheet } from './transform'
 import type {
   TimesheetData,
@@ -42,40 +42,7 @@ export const fetchTimesheet = async (
     }
   }
 
-  // Пробуем использовать методы timeman для получения данных о времени работы
-  // Согласно документации Bitrix24:
-  // - timeman.status - получить информацию о текущем рабочем дне пользователя
-  // - timeman.schedule.get - получить рабочий график по ID (требует параметр {id})
-  // Документация: https://apidocs.bitrix24.ru/api-reference/index.html
-
-  // Пробуем timeman.status для получения информации о текущем рабочем дне пользователя
-  // Этот метод возвращает информацию о текущем рабочем дне текущего пользователя
-  try {
-    interface TimemanStatusData {
-      [key: string]: unknown
-    }
-
-    const statusData = await requestWrapper<TimemanStatusData, TimemanStatusData>(
-      'timeman.status',
-      {},
-      (result) => result
-    )
-
-    if (statusData) {
-      console.info('Получены данные о рабочем дне через timeman.status:', statusData)
-      // timeman.status возвращает данные о текущем рабочем дне текущего пользователя
-      // Для получения данных всех пользователей нужно вызывать для каждого отдельно
-      // Пока используем fallback для получения полной структуры табеля
-    }
-  } catch (statusError) {
-    const errorMessage = statusError instanceof Error ? statusError.message : String(statusError)
-    if (!errorMessage.includes('404') && !errorMessage.includes('METHOD_NOT_FOUND')) {
-      console.warn('Ошибка при вызове timeman.status:', statusError)
-    }
-  }
-
-  // Если методы timeman не вернули нужные данные, используем альтернативный подход
-  // Получаем пользователей для формирования базовой структуры табеля
+  // Получаем пользователей для формирования структуры табеля
   const userFilter: Record<string, unknown> = { ACTIVE: true }
   if (filters.departmentId && filters.departmentId !== '0') {
     userFilter.UF_DEPARTMENT = filters.departmentId
@@ -96,7 +63,114 @@ export const fetchTimesheet = async (
     (result) => result
   )
 
-  // Формируем базовую структуру табеля без данных о времени
+  // Получаем данные о времени работы для каждого пользователя через timeman.status
+  // Для получения данных за период нужно вызывать для каждого дня месяца
+  const startDate = filters.month && filters.year
+    ? new Date(filters.year, filters.month - 1, 1)
+    : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const endDate = filters.month && filters.year
+    ? new Date(filters.year, filters.month, 0)
+    : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+
+  const timesheetEntries: Array<{
+    EMPLOYEE_ID: string
+    EMPLOYEE_NAME: string
+    EMPLOYEE_CODE: string
+    DATE: string
+    HOURS: number
+    MINUTES: number
+    DEPARTMENT_ID?: string
+    DEPARTMENT_NAME?: string
+  }> = []
+
+  // Для каждого пользователя пытаемся получить данные о времени работы
+  // 
+  // ВАЖНО: Bitrix24 REST API не предоставляет прямого метода для получения
+  // рабочих часов пользователя за период. Доступные методы:
+  // - timeman.status - возвращает только текущий рабочий день пользователя
+  // - timeman.settings - настройки учета времени
+  //
+  // Для получения истории за период может потребоваться:
+  // 1. Использовать методы работы с записями (entity methods) если доступны
+  // 2. Хранить данные локально при каждом вызове timeman.status
+  // 3. Использовать сторонние приложения из маркетплейса Bitrix24
+  //
+  // Примечание: timeman.status может требовать права администратора для получения
+  // данных других пользователей (не текущего)
+  for (const user of users) {
+    try {
+      // Пробуем получить данные через timeman.status
+      // Метод возвращает данные о текущем рабочем дне пользователя
+      // Параметр USER_ID может не работать без прав администратора
+      const statusData = await requestWrapper<TimemanStatusData, TimemanStatusData>(
+        'timeman.status',
+        {
+          // USER_ID может не работать без прав администратора
+          // Если не указать, вернет данные текущего пользователя
+          ...(user.ID ? { USER_ID: user.ID } : {}),
+        },
+        (result) => result
+      )
+
+      if (statusData) {
+        const result = statusData.result || statusData
+        
+        // Обрабатываем разные форматы дат
+        let dateStart: Date | null = null
+        if (result.date_start) {
+          // Если это ISO строка
+          if (typeof result.date_start === 'string') {
+            dateStart = new Date(result.date_start)
+          } else if (typeof result.date_start === 'number') {
+            // Если это timestamp
+            dateStart = new Date(result.date_start * 1000)
+          }
+        } else if (result.time?.start) {
+          dateStart = new Date(result.time.start * 1000)
+        } else if (result.start) {
+          dateStart = new Date(result.start * 1000)
+        }
+
+        // Проверяем, попадает ли дата в нужный период
+        if (dateStart && !isNaN(dateStart.getTime()) && dateStart >= startDate && dateStart <= endDate) {
+          const dateStr = dateStart.toISOString().split('T')[0]
+          
+          // Получаем duration в секундах
+          const durationSeconds = result.duration || result.time?.duration || 0
+          
+          // Если duration 0, но есть operating (время работы)
+          const operatingSeconds = result.operating || 0
+          const actualDuration = durationSeconds > 0 ? durationSeconds : operatingSeconds
+          
+          if (actualDuration > 0) {
+            const hours = Math.floor(actualDuration / 3600)
+            const minutes = Math.floor((actualDuration % 3600) / 60)
+
+            if (hours > 0 || minutes > 0) {
+              timesheetEntries.push({
+                EMPLOYEE_ID: user.ID,
+                EMPLOYEE_NAME: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
+                EMPLOYEE_CODE: `#${user.ID}`,
+                DATE: dateStr,
+                HOURS: hours,
+                MINUTES: minutes,
+              })
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Игнорируем ошибки для отдельных пользователей
+      console.debug(`Не удалось получить данные timeman для пользователя ${user.ID}:`, error)
+    }
+  }
+
+  // Если получили данные через timeman, преобразуем их
+  if (timesheetEntries.length > 0) {
+    return TransformTimesheet.fromDTOArray(timesheetEntries as any)
+  }
+
+  // Если данных нет, возвращаем пустую структуру
   return {
     departmentId: filters.departmentId,
     departmentName: filters.departmentName || 'Все подразделения',
