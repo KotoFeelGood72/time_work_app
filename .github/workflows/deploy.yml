@@ -29,16 +29,14 @@ jobs:
         run: npm run build
 
       - name: Deploy to server via SFTP
-        uses: SamKirkland/FTP-Deploy-Action@master
+        uses: easingthemes/ssh-deploy@v4
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-rlgoDzvc -i --delete"
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_SERVER_DIR || '/public_html/' }}
-          local-dir: ./dist/
-          protocol: sftp
-          port: 22
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.FTP_SERVER }}
+          REMOTE_USER: ${{ secrets.FTP_USER }}
+          REMOTE_PORT: ${{ secrets.FTP_PORT || '22' }}
+          SOURCE: "dist/"
+          TARGET: ${{ secrets.FTP_SERVER_DIR || '/public_html/' }}
