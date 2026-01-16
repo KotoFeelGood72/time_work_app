@@ -31,26 +31,27 @@
     </div>
 
     <!-- Компактная таблица -->
-    <div v-if="!loading && !error" class="overflow-x-auto compact-table-wrapper">
-      <table class="compact-timesheet-table w-full border-collapse bg-white dark:bg-gray rounded-lg overflow-hidden text-sm">
-        <thead>
-          <tr class="bg-gray-100 dark:bg-gray-800">
-            <th class="px-2 py-1.5 text-left border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-10 min-w-[140px]">
-              ФИО сотрудника
-            </th>
-            <th
-              v-for="day in daysInMonth"
-              :key="day.date"
-              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs min-w-[50px]"
-            >
-              <div class="leading-tight">{{ day.day }}</div>
-              <div class="text-10 text-gray-600 dark:text-gray-400 leading-tight">{{ day.dayName }}</div>
-            </th>
-            <th class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-100 dark:bg-gray-800 min-w-[60px]">
-              Итого
-            </th>
-          </tr>
-        </thead>
+    <div v-if="!loading && !error" class="compact-table-wrapper">
+      <div class="overflow-x-auto overflow-y-auto compact-table-scroll">
+        <table class="compact-timesheet-table w-full border-collapse bg-white dark:bg-gray rounded-lg overflow-hidden text-sm">
+          <thead class="sticky top-0 z-20">
+            <tr class="bg-gray-100 dark:bg-gray-800">
+              <th class="px-2 py-1.5 text-left border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-30 min-w-[140px]">
+                ФИО сотрудника
+              </th>
+              <th
+                v-for="day in daysInMonth"
+                :key="day.date"
+                class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs min-w-[50px] bg-gray-100 dark:bg-gray-800"
+              >
+                <div class="leading-tight">{{ day.day }}</div>
+                <div class="text-10 text-gray-600 dark:text-gray-400 leading-tight">{{ day.dayName }}</div>
+              </th>
+              <th class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-100 dark:bg-gray-800 min-w-[60px] sticky right-0 z-30">
+                Итого
+              </th>
+            </tr>
+          </thead>
         <tbody>
           <tr
             v-for="employee in timesheetData.employees"
@@ -85,25 +86,28 @@
             </td>
           </tr>
           <!-- Итоговая строка -->
-          <tr class="bg-gray-100 dark:bg-gray-800 font-bold">
-            <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-10">
-              <div class="text-xs">ИТОГО: {{ timesheetData.workingDays }} дн.</div>
-            </td>
-            <td
-              v-for="day in daysInMonth"
-              :key="day.date"
-              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs"
-            >
-              <div v-if="getDailyTotal(day.date)" class="font-semibold">
-                {{ formatTime(getDailyTotal(day.date)!) }}
-              </div>
-            </td>
-            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs bg-yellow-100 dark:bg-yellow-900 font-bold">
-              {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
-            </td>
-          </tr>
+          <tfoot class="sticky bottom-0 z-20">
+            <tr class="bg-gray-100 dark:bg-gray-800 font-bold">
+              <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-30">
+                <div class="text-xs">ИТОГО: {{ timesheetData.workingDays }} дн.</div>
+              </td>
+              <td
+                v-for="day in daysInMonth"
+                :key="day.date"
+                class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs bg-gray-100 dark:bg-gray-800"
+              >
+                <div v-if="getDailyTotal(day.date)" class="font-semibold">
+                  {{ formatTime(getDailyTotal(day.date)!) }}
+                </div>
+              </td>
+              <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs bg-yellow-100 dark:bg-yellow-900 font-bold sticky right-0 z-30">
+                {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
+              </td>
+            </tr>
+          </tfoot>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- Кнопки действий -->
@@ -330,12 +334,21 @@ onMounted(() => {
 
 <style scoped>
 .compact-table-wrapper {
-  max-height: calc(100vh - 300px);
+  height: calc(100vh - 300px);
+  display: flex;
+  flex-direction: column;
+}
+
+.compact-table-scroll {
+  flex: 1;
+  overflow: auto;
+  max-height: 100%;
 }
 
 .compact-timesheet-table {
   font-size: 0.75rem;
   line-height: 1.2;
+  position: relative;
 }
 
 .compact-timesheet-table th,
@@ -343,10 +356,42 @@ onMounted(() => {
   padding: 0.25rem 0.375rem;
 }
 
-.compact-timesheet-table thead th {
+/* Закрепление шапки */
+.compact-timesheet-table thead {
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 20;
+}
+
+.compact-timesheet-table thead th {
+  background-color: rgb(243 244 246);
+}
+
+.dark .compact-timesheet-table thead th {
+  background-color: rgb(31 41 55);
+}
+
+/* Закрепление footer */
+.compact-timesheet-table tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+}
+
+.compact-timesheet-table tfoot td {
+  background-color: rgb(243 244 246);
+}
+
+.dark .compact-timesheet-table tfoot td {
+  background-color: rgb(31 41 55);
+}
+
+.compact-timesheet-table tfoot td.bg-yellow-100 {
+  background-color: rgb(254 249 195) !important;
+}
+
+.dark .compact-timesheet-table tfoot td.bg-yellow-100 {
+  background-color: rgb(113 63 18) !important;
 }
 
 .compact-timesheet-table tbody tr {
@@ -363,5 +408,28 @@ onMounted(() => {
   font-size: 0.7rem;
   padding: 0.125rem 0.25rem;
   line-height: 1.2;
+}
+
+/* Улучшенная прокрутка */
+.compact-table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.compact-table-scroll::-webkit-scrollbar-track {
+  background: rgb(243 244 246);
+}
+
+.dark .compact-table-scroll::-webkit-scrollbar-track {
+  background: rgb(31 41 55);
+}
+
+.compact-table-scroll::-webkit-scrollbar-thumb {
+  background: rgb(156 163 175);
+  border-radius: 4px;
+}
+
+.compact-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(107 114 128);
 }
 </style>
