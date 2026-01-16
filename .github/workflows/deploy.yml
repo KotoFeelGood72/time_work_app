@@ -37,7 +37,7 @@ jobs:
           SFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           SFTP_SERVER: ${{ secrets.FTP_SERVER }}
           SFTP_PORT: ${{ secrets.FTP_PORT || '22' }}
-          SFTP_DIR: ${{ secrets.FTP_SERVER_DIR || '/public_html/' }}
+          SFTP_DIR: ${{ secrets.FTP_SERVER_DIR || 'data/www/vueapp.itcenter.pro/' }}
         run: |
           lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" -p "${SFTP_PORT}" sftp://"${SFTP_SERVER}" <<LFTP_EOF
           set sftp:auto-confirm yes
