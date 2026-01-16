@@ -39,8 +39,9 @@ jobs:
           SFTP_PORT: ${{ secrets.FTP_PORT || '22' }}
           SFTP_DIR: ${{ secrets.FTP_SERVER_DIR || '/public_html/' }}
         run: |
-          lftp -u ${SFTP_USER},${SFTP_PASSWORD} -p ${SFTP_PORT} sftp://${SFTP_SERVER} <<EOF
+          lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" -p "${SFTP_PORT}" sftp://"${SFTP_SERVER}" <<LFTP_EOF
           set sftp:auto-confirm yes
+          set sftp:connect-program "ssh -a -x -oStrictHostKeyChecking=no"
           mirror --reverse --delete --verbose --exclude-glob .git* --exclude-glob node_modules* ./dist/ ${SFTP_DIR}
           quit
-          EOF
+          LFTP_EOF
