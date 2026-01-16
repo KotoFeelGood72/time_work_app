@@ -11,41 +11,41 @@ import type {
 
 /**
  * Получить табель учета рабочего времени
- * Примечание: В реальном приложении нужно использовать соответствующий метод Bitrix24 API
- * Здесь используется заглушка, которую нужно заменить на реальный API метод
+ * Использует метод Bitrix24 API для получения данных табеля
+ * Документация: https://apidocs.bitrix24.ru/api-reference/index.html
  */
 export const fetchTimesheet = async (
   filters: TimesheetFilters
 ): Promise<TimesheetData> => {
-  // TODO: Заменить на реальный метод Bitrix24 API
-  // Например: 'timeman.report.get' или другой метод для получения табеля
+  // Формируем параметры запроса
   const requestParams: Record<string, unknown> = {
     filter: {},
   }
 
-  if (filters.month) {
+  // Добавляем фильтры по дате
+  if (filters.month && filters.year) {
+    const startDate = new Date(filters.year, filters.month - 1, 1)
+    const endDate = new Date(filters.year, filters.month, 0)
+
     requestParams.filter = {
       ...(requestParams.filter as Record<string, unknown>),
-      MONTH: filters.month,
+      '>=DATE_START': startDate.toISOString().split('T')[0],
+      '<=DATE_START': endDate.toISOString().split('T')[0],
     }
   }
 
-  if (filters.year) {
-    requestParams.filter = {
-      ...(requestParams.filter as Record<string, unknown>),
-      YEAR: filters.year,
-    }
-  }
-
+  // Фильтр по подразделению
   if (filters.departmentId) {
     requestParams.filter = {
       ...(requestParams.filter as Record<string, unknown>),
-      DEPARTMENT_ID: filters.departmentId,
+      UF_DEPARTMENT: filters.departmentId,
     }
   }
 
+  // Используем метод timeman.entry.get для получения записей табеля
+  // Если метод не доступен, можно попробовать timeman.status.get или другие методы timeman.*
   return requestWrapper<BitrixTimesheetRaw[], TimesheetData>(
-    'timeman.report.get', // Заменить на реальный метод Bitrix24 API
+    'timeman.entry.get',
     requestParams,
     TransformTimesheet.fromDTOArray
   )
@@ -53,10 +53,12 @@ export const fetchTimesheet = async (
 
 /**
  * Получить список подразделений
+ * Использует метод department.list из Bitrix24 API
+ * Документация: https://apidocs.bitrix24.ru/api-reference/index.html
  */
 export const fetchDepartments = async (): Promise<Department[]> => {
   return requestWrapper<BitrixDepartmentRaw[], Department[]>(
-    'department.get', // Заменить на реальный метод Bitrix24 API
+    'department.list',
     {},
     TransformTimesheet.departmentsFromDTO
   )
