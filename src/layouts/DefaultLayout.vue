@@ -1,11 +1,9 @@
 <template>
-  <div>
-    <TheHeader />
-    <main>
-      <slot/>
-    </main>
-    <TheFooter />
-  </div>
+  <TheHeader />
+  <main class="min-h-screen bg-white dark:bg-dark transition-colors duration-300">
+    <slot/>
+  </main>
+  <TheFooter />
 </template>
 
 <script setup lang="ts">
