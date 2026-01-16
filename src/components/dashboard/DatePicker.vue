@@ -1,28 +1,16 @@
 <template>
   <div class="relative date-picker-wrapper">
-    <button
-      @click="toggleCalendar"
-      class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
-    >
-      {{ formattedDate }}
-    </button>
-
-    <div
-      v-if="isOpen"
-      class="absolute top-full left-0 mt-2 z-50 bg-white dark:bg-gray rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 p-4"
-      @click.stop
-    >
-      <VueDatePicker
+    <VueDatePicker
         v-model="selectedDate"
         :locale="locale"
         month-picker
         :enable-time-picker="false"
         :format="format"
         auto-apply
+        @closed="handleDateChange(selectedDate)"
         @update:model-value="handleDateChange"
         class="datepicker-custom"
       />
-    </div>
   </div>
 </template>
 
@@ -48,18 +36,6 @@ const locale = computed(() => ru)
 const format = computed(() => {
   return 'MMMM yyyy'
 })
-
-const formattedDate = computed(() => {
-  const monthNames = [
-    'ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН',
-    'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'
-  ]
-  return `${monthNames[props.modelValue.month - 1]} ${props.modelValue.year}`
-})
-
-const toggleCalendar = () => {
-  isOpen.value = !isOpen.value
-}
 
 const handleDateChange = (date: Date | null) => {
   if (date) {
