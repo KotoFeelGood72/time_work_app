@@ -28,15 +28,14 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
       - name: Deploy to server via SFTP
-        uses: easingthemes/ssh-deploy@v4
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          ARGS: "-rlgoDzvc -i --delete"
-        with:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ secrets.FTP_SERVER }}
-          REMOTE_USER: ${{ secrets.FTP_USER }}
-          REMOTE_PORT: ${{ secrets.FTP_PORT || '22' }}
-          SOURCE: "dist/"
-          TARGET: ${{ secrets.FTP_SERVER_DIR || '/public_html/' }}
+        run: |
+          lftp -c "
+          set sftp:auto-confirm yes
+          open -u ${{ secrets.FTP_USER }},${{ secrets.FTP_PASSWORD }} -p ${{ secrets.FTP_PORT || '22' }} sftp://${{ secrets.FTP_SERVER }}
+          mirror --reverse --delete --verbose --exclude-glob .git* --exclude-glob node_modules* ./dist/ ${{ secrets.FTP_SERVER_DIR || '/public_html/' }}
+          quit
+          "
