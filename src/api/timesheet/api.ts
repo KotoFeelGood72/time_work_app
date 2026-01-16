@@ -43,35 +43,14 @@ export const fetchTimesheet = async (
   }
 
   // Пробуем использовать методы timeman для получения данных о времени работы
-  // Согласно документации: timeman.schedule.get - получение настроек рабочего графика
+  // Согласно документации Bitrix24:
+  // - timeman.status - получить информацию о текущем рабочем дне пользователя
+  // - timeman.schedule.get - получить рабочий график по ID (требует параметр {id})
   // Документация: https://apidocs.bitrix24.ru/api-reference/index.html
-
-  // Сначала пробуем timeman.schedule.get для получения рабочих графиков
-  // Документация: https://apidocs.bitrix24.ru/api-reference/index.html
-  try {
-    interface ScheduleData {
-      [key: string]: unknown
-    }
-
-    const scheduleData = await requestWrapper<ScheduleData, ScheduleData>(
-      'timeman.schedule.get',
-      {},
-      (result) => result
-    )
-
-    if (scheduleData) {
-      console.info('Получены данные о рабочих графиках через timeman.schedule.get')
-      // Здесь можно обработать данные о графиках для формирования табеля
-    }
-  } catch {
-    console.info('Метод timeman.schedule.get недоступен или не вернул данные')
-  }
 
   // Пробуем timeman.status для получения информации о текущем рабочем дне пользователя
-  // Согласно документации: timeman.status - получить информацию о текущем рабочем дне пользователя
+  // Этот метод возвращает информацию о текущем рабочем дне текущего пользователя
   try {
-    // timeman.status возвращает информацию о текущем рабочем дне
-    // Может потребоваться передать USER_ID для получения данных конкретного пользователя
     interface TimemanStatusData {
       [key: string]: unknown
     }
@@ -83,12 +62,16 @@ export const fetchTimesheet = async (
     )
 
     if (statusData) {
-      console.info('Получены данные о рабочем дне через timeman.status')
-      // Здесь можно обработать данные для формирования табеля
-      // Пока используем fallback для получения полной структуры
+      console.info('Получены данные о рабочем дне через timeman.status:', statusData)
+      // timeman.status возвращает данные о текущем рабочем дне текущего пользователя
+      // Для получения данных всех пользователей нужно вызывать для каждого отдельно
+      // Пока используем fallback для получения полной структуры табеля
     }
-  } catch {
-    console.info('Метод timeman.status недоступен или не вернул данные')
+  } catch (statusError) {
+    const errorMessage = statusError instanceof Error ? statusError.message : String(statusError)
+    if (!errorMessage.includes('404') && !errorMessage.includes('METHOD_NOT_FOUND')) {
+      console.warn('Ошибка при вызове timeman.status:', statusError)
+    }
   }
 
   // Если методы timeman не вернули нужные данные, используем альтернативный подход
