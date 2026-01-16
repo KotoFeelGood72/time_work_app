@@ -89,8 +89,26 @@
 
     // Преобразуем данные для vue3-datatable
     const rows = filteredEmployees.map((employee) => {
+      // Пересчитываем общее время работы на основе entries
+      let totalHours = 0
+      let totalMinutes = 0
+
+      Object.values(employee.entries).forEach((entry) => {
+        if (entry) {
+          totalHours += entry.hours || 0
+          totalMinutes += entry.minutes || 0
+        }
+      })
+
+      // Нормализуем минуты (60 минут = 1 час)
+      const totalMinutesNormalized = totalMinutes + totalHours * 60
+      const normalizedHours = Math.floor(totalMinutesNormalized / 60)
+      const normalizedMinutes = totalMinutesNormalized % 60
+
       const row: Record<string, unknown> = {
         ...employee,
+        totalHours: normalizedHours,
+        totalMinutes: normalizedMinutes,
       }
 
       // Добавляем поля для каждой колонки дня
@@ -284,7 +302,7 @@
 
         <!-- Слот для колонки итого -->
         <template #total="props">
-          <div class="px-2 py-1.5 text-center text-black dark:text-white font-semibold text-xs">
+          <div class="px-2 py-1.5 text-center text-red-600 dark:text-red-400 font-bold text-xs">
             {{ formatTotalTime((props.value || props.data).totalHours, (props.value || props.data).totalMinutes) }}
           </div>
         </template>
