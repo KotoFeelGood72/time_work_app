@@ -3,8 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - main
-      - master
+      - dev
   workflow_dispatch:
 
 jobs:
@@ -36,7 +35,7 @@ jobs:
           SFTP_USER: ${{ secrets.FTP_USER }}
           SFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           SFTP_SERVER: ${{ secrets.FTP_SERVER }}
-          SFTP_PORT: ${{ secrets.FTP_PORT || '22' }}
+          SFTP_PORT: ${{ secrets.FTP_PORT }}
           SFTP_DIR: '/var/www/vueapp_itcen_usr/data/www/vueapp.itcenter.pro/'
           LOCAL_DIR: ${{ github.workspace }}/dist
         run: |
