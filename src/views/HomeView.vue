@@ -1,44 +1,260 @@
+<script setup lang="ts">
+  import { ref, computed, onMounted, watch } from 'vue'
+  import type {  Department, TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
+  import { useReportsStore, useReportsStoreRefs } from '@/stores/useReportsStore'
+  import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
+  import DateSelect from '@/components/dashboard/DateSelect.vue'
+  import EmployeeRow from '@/components/timesheet/EmployeeRow.vue'
+  import DayCell from '@/components/timesheet/DayCell.vue'
+  import InputSearch from '@/components/ui/inputs/InputSearch.vue'
+  // @ts-expect-error - vue3-datatable types are not exported correctly
+  import Vue3Datatable from '@bhplugin/vue3-datatable'
+  import '@bhplugin/vue3-datatable/dist/style.css'
+
+  const reportsStore = useReportsStore()
+  const {
+    loading,
+    error,
+    timesheetData,
+    departments,
+    selectedDepartment,
+    currentMonth,
+    currentYear,
+  } = useReportsStoreRefs()
+
+  const searchQuery = ref('')
+  const showEmpty = ref(false)
+
+  // Пагинация, сортировка и отображение количества записей управляются плагином vue3-datatable
+
+  const isDayDetailsModalOpen = ref(false)
+  const selectedDayData = ref<{
+    employeeId: string
+    employeeCode: string
+    employeeName: string
+    date: string
+    timeEntry?: TimeEntry
+  } | null>(null)
+
+  const dateFilter = computed({
+    get: () => ({
+      month: currentMonth.value ?? new Date().getMonth() + 1,
+      year: currentYear.value ?? new Date().getFullYear(),
+    }),
+    set: (value: { month: number; year: number }) => {
+      reportsStore.setDate(value.month, value.year)
+    },
+  })
+
+  const daysInMonth = computed(() => {
+    const days: Array<{ date: string; day: number; dayName: string }> = []
+    const year = currentYear.value ?? new Date().getFullYear()
+    const month = currentMonth.value ?? new Date().getMonth() + 1
+    const daysInMonthCount = new Date(year, month, 0).getDate()
+    const dayNames = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
+
+    for (let day = 1; day <= daysInMonthCount; day++) {
+      const date = new Date(year, month - 1, day)
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      const dayIndex = date.getDay()
+      days.push({
+        date: dateStr,
+        day,
+        dayName: dayNames[dayIndex] || 'вс',
+      })
+    }
+
+    return days
+  })
+
+  // Данные для таблицы
+  const tableRows = computed(() => {
+    // Проверяем, что есть данные
+    if (!timesheetData.value.employees || timesheetData.value.employees.length === 0) {
+      console.log('No employees data')
+      return []
+    }
+
+    // Фильтруем сотрудников по поисковому запросу
+    let filteredEmployees = timesheetData.value.employees
+
+    if (searchQuery.value.trim()) {
+      const query = searchQuery.value.trim().toLowerCase()
+      filteredEmployees = timesheetData.value.employees.filter((employee) => {
+        const nameMatch = employee.employeeName.toLowerCase().includes(query)
+        const codeMatch = employee.employeeCode.toLowerCase().includes(query)
+        return nameMatch || codeMatch
+      })
+    }
+
+    // Преобразуем данные для vue3-datatable
+    const rows = filteredEmployees.map((employee) => {
+      const row: Record<string, unknown> = {
+        ...employee,
+      }
+
+      // Добавляем поля для каждой колонки дня
+      daysInMonth.value.forEach((day) => {
+        row[`day_${day.date}`] = employee.entries[day.date] || null
+      })
+
+      return row
+    })
+
+    console.log('Table rows prepared:', rows.length, 'employees:', timesheetData.value.employees.length)
+    return rows
+  })
+
+  // Колонки для таблицы
+  const tableColumns = computed(() => {
+    const columns: Array<{
+      field: string
+      title: string
+      width?: string
+      sort?: boolean
+      isUnique?: boolean
+    }> = [
+      {
+        field: 'employee',
+        title: 'ФИО сотрудника',
+        width: '140px',
+        isUnique: true,
+        sort: true,
+      },
+    ]
+
+    // Добавляем колонки для каждого дня
+    daysInMonth.value.forEach((day) => {
+      columns.push({
+        field: `day_${day.date}`,
+        title: `${day.day} ${day.dayName}`,
+        width: '50px',
+        sort: false,
+      })
+    })
+
+    // Колонка итого
+    columns.push({
+      field: 'total',
+      title: 'Итого',
+      width: '60px',
+      sort: true,
+    })
+
+    console.log('Table columns:', columns.length)
+    return columns
+  })
+
+
+
+
+  const getDailyTotal = (date: string): TimeEntry | null => {
+    const total = timesheetData.value.dailyTotals[date]
+    if (!total) return null
+    return {
+      date,
+      hours: total.hours,
+      minutes: total.minutes,
+    }
+  }
+
+  const formatTime = (entry: TimeEntry): string => {
+    const hours = entry.hours.toString().padStart(2, '0')
+    const minutes = entry.minutes.toString().padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+
+  const formatTotalTime = (hours: number, minutes: number): string => {
+    const totalMinutes = hours * 60 + minutes
+    const h = Math.floor(totalMinutes / 60)
+    const m = totalMinutes % 60
+    return `${h}:${m.toString().padStart(2, '0')}`
+  }
+
+
+  const isDepartmentSelected = (departmentId: string): boolean => {
+    return selectedDepartment.value?.id === departmentId
+  }
+
+  const toggleDepartment = (department: Department) => {
+    reportsStore.toggleDepartment(department)
+    reportsStore.loadTimesheet()
+  }
+
+  const clearCache = () => {
+    // Очистка кэша (если нужно)
+    console.log('Кэш очищен')
+  }
+
+  const refreshData = () => {
+    reportsStore.loadTimesheet()
+  }
+
+  const toggleShowEmpty = () => {
+    showEmpty.value = !showEmpty.value
+    // Логика показа пустых строк
+  }
+
+  const openDayDetails = (employee: EmployeeTimeData, date: string) => {
+    const timeEntry = employee.entries[date] || null
+    selectedDayData.value = {
+      employeeId: employee.employeeId,
+      employeeCode: employee.employeeCode,
+      employeeName: employee.employeeName,
+      date,
+      timeEntry: timeEntry || undefined,
+    }
+    isDayDetailsModalOpen.value = true
+  }
+
+  const closeDayDetailsModal = () => {
+    isDayDetailsModalOpen.value = false
+    selectedDayData.value = null
+  }
+
+  watch([currentMonth, currentYear], () => {
+    reportsStore.loadTimesheet()
+  })
+
+  onMounted(() => {
+    reportsStore.loadDepartments()
+    reportsStore.loadTimesheet()
+  })
+  </script>
+
 <template>
   <div class="home-view min-h-screen bg-white dark:bg-dark transition-colors duration-300 pt-20 px-4 pb-8">
-    <!-- Фильтры -->
-    <div class="flex items-center gap-4 mb-6 flex-wrap">
-      <DatePicker
-        v-model="dateFilter"
-        @update:model-value="handleDateChange"
-      />
+    <div class="flex items-center justify-between pb-8">
+      <div class="flex items-center gap-4 flex-wrap">
+        <DateSelect
+          v-model="dateFilter"
+        />
 
-      <button
-        @click="openDepartmentModal"
-        class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-black dark:text-white rounded-lg font-semibold transition-colors"
-      >
-        {{ selectedDepartment?.name || 'ПОДРАЗДЕЛЕНИЕ' }}
-      </button>
-    </div>
-
-    <!-- Заголовок подразделения -->
-    <h2 v-if="timesheetData.departmentName" class="text-24 font-bold text-black dark:text-white mb-4">
-      {{ timesheetData.departmentName }}
-    </h2>
-
-    <!-- Загрузка -->
-    <div v-if="loading" class="text-18 text-black dark:text-white">
-      Загрузка...
-    </div>
-
-    <!-- Ошибка -->
-    <div v-if="error" class="text-red-600 dark:text-red-400 mb-4">
-      {{ error }}
-    </div>
-
-    <!-- Таблица с vue3-datatable -->
-    <div v-if="!loading && !error" class="timesheet-table-wrapper">
-      <!-- Отладочная информация -->
-      <div v-if="tableRows.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
-        Нет данных для отображения. Загружено сотрудников: {{ timesheetData.employees.length }}
+        <InputSearch
+          v-model="searchQuery"
+          class="flex-1 min-w-[200px] max-w-[400px]"
+        />
       </div>
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button
+          v-for="dept in departments"
+          :key="dept.id"
+          @click="toggleDepartment(dept)"
+          :class="[
+            'px-4 py-2 rounded-lg font-semibold transition-colors text-sm',
+            isDepartmentSelected(dept.id)
+              ? 'bg-blue-500 hover:bg-blue-600 text-white'
+              : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-black dark:text-white'
+          ]"
+        >
+          {{ dept.name }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="!loading && !error" class="timesheet-table-wrapper">
 
       <Vue3Datatable
-        v-else
         :rows="tableRows"
         :columns="tableColumns"
         :loading="loading"
@@ -118,15 +334,6 @@
       </button>
     </div>
 
-    <!-- Модальное окно выбора подразделения -->
-    <DepartmentModal
-      :is-open="isDepartmentModalOpen"
-      :departments="departments"
-      :selected-department-id="selectedDepartment?.id"
-      @close="closeDepartmentModal"
-      @select="handleDepartmentSelect"
-    />
-
     <!-- Модальное окно деталей дня -->
     <DayDetailsModal
       :is-open="isDayDetailsModalOpen"
@@ -139,291 +346,6 @@
     />
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { fetchTimesheet, fetchDepartments } from '@/api/timesheet/api'
-import type { TimesheetData, Department, TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
-import DepartmentModal from '@/components/dashboard/DepartmentModal.vue'
-import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
-import DatePicker from '@/components/dashboard/DatePicker.vue'
-import EmployeeRow from '@/components/timesheet/EmployeeRow.vue'
-import DayCell from '@/components/timesheet/DayCell.vue'
-// @ts-expect-error - типы не экспортируются правильно
-import Vue3Datatable from '@bhplugin/vue3-datatable'
-import '@bhplugin/vue3-datatable/dist/style.css'
-
-const loading = ref(false)
-const error = ref<string | null>(null)
-const timesheetData = ref<TimesheetData>({
-  departmentName: '',
-  month: new Date().getMonth() + 1,
-  year: new Date().getFullYear(),
-  employees: [],
-  workingDays: 0,
-  dailyTotals: {},
-  grandTotal: { hours: 0, minutes: 0 },
-})
-
-const departments = ref<Department[]>([])
-const selectedDepartment = ref<Department | null>(null)
-const isDepartmentModalOpen = ref(false)
-const showEmpty = ref(false)
-
-// Пагинация, сортировка и отображение количества записей управляются плагином vue3-datatable
-
-const isDayDetailsModalOpen = ref(false)
-const selectedDayData = ref<{
-  employeeId: string
-  employeeCode: string
-  employeeName: string
-  date: string
-  timeEntry?: TimeEntry
-} | null>(null)
-
-const currentMonth = ref(new Date().getMonth() + 1)
-const currentYear = ref(new Date().getFullYear())
-
-const dateFilter = computed({
-  get: () => ({
-    month: currentMonth.value,
-    year: currentYear.value,
-  }),
-  set: (value: { month: number; year: number }) => {
-    currentMonth.value = value.month
-    currentYear.value = value.year
-  },
-})
-
-const daysInMonth = computed(() => {
-  const days: Array<{ date: string; day: number; dayName: string }> = []
-  const daysInMonthCount = new Date(currentYear.value, currentMonth.value, 0).getDate()
-  const dayNames = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
-
-  for (let day = 1; day <= daysInMonthCount; day++) {
-    const date = new Date(currentYear.value, currentMonth.value - 1, day)
-    const dateStr = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    const dayIndex = date.getDay()
-    days.push({
-      date: dateStr,
-      day,
-      dayName: dayNames[dayIndex] || 'вс',
-    })
-  }
-
-  return days
-})
-
-// Данные для таблицы
-const tableRows = computed(() => {
-  // Проверяем, что есть данные
-  if (!timesheetData.value.employees || timesheetData.value.employees.length === 0) {
-    console.log('No employees data')
-    return []
-  }
-
-  // Преобразуем данные для vue3-datatable
-  const rows = timesheetData.value.employees.map((employee) => {
-    const row: Record<string, unknown> = {
-      ...employee,
-    }
-
-    // Добавляем поля для каждой колонки дня
-    daysInMonth.value.forEach((day) => {
-      row[`day_${day.date}`] = employee.entries[day.date] || null
-    })
-
-    return row
-  })
-
-  console.log('Table rows prepared:', rows.length, 'employees:', timesheetData.value.employees.length)
-  return rows
-})
-
-// Колонки для таблицы
-const tableColumns = computed(() => {
-  const columns: Array<{
-    field: string
-    title: string
-    width?: string
-    sort?: boolean
-    isUnique?: boolean
-  }> = [
-    {
-      field: 'employee',
-      title: 'ФИО сотрудника',
-      width: '140px',
-      isUnique: true,
-      sort: true,
-    },
-  ]
-
-  // Добавляем колонки для каждого дня
-  daysInMonth.value.forEach((day) => {
-    columns.push({
-      field: `day_${day.date}`,
-      title: `${day.day} ${day.dayName}`,
-      width: '50px',
-      sort: false,
-    })
-  })
-
-  // Колонка итого
-  columns.push({
-    field: 'total',
-    title: 'Итого',
-    width: '60px',
-    sort: true,
-  })
-
-  console.log('Table columns:', columns.length)
-  return columns
-})
-
-
-const loadTimesheet = async () => {
-  loading.value = true
-  error.value = null
-
-  try {
-    if (typeof window !== 'undefined') {
-      const windowWithBX24 = window as Window & {
-        BX24?: {
-          init: (callback: () => void) => void
-        }
-      }
-
-      if (windowWithBX24.BX24) {
-      await new Promise<void>((resolve) => {
-          windowWithBX24.BX24!.init(() => {
-          resolve()
-        })
-      })
-      }
-    }
-
-    const result = await fetchTimesheet({
-      month: currentMonth.value,
-      year: currentYear.value,
-      departmentId: selectedDepartment.value?.id,
-      departmentName: selectedDepartment.value?.name || undefined,
-    })
-
-    timesheetData.value = result
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Ошибка при загрузке табеля'
-    console.error('Ошибка загрузки табеля:', err)
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadDepartments = async () => {
-  try {
-    if (typeof window !== 'undefined') {
-      const windowWithBX24 = window as Window & {
-        BX24?: {
-          init: (callback: () => void) => void
-        }
-      }
-
-      if (windowWithBX24.BX24) {
-        await new Promise<void>((resolve) => {
-          windowWithBX24.BX24!.init(() => {
-            resolve()
-          })
-        })
-      }
-    }
-
-    const result = await fetchDepartments()
-    departments.value = result
-  } catch (err) {
-    console.error('Ошибка загрузки подразделений:', err)
-  }
-}
-
-const getDailyTotal = (date: string): TimeEntry | null => {
-  const total = timesheetData.value.dailyTotals[date]
-  if (!total) return null
-  return {
-    date,
-    hours: total.hours,
-    minutes: total.minutes,
-  }
-}
-
-const formatTime = (entry: TimeEntry): string => {
-  const hours = entry.hours.toString().padStart(2, '0')
-  const minutes = entry.minutes.toString().padStart(2, '0')
-  return `${hours}:${minutes}`
-}
-
-const formatTotalTime = (hours: number, minutes: number): string => {
-  const totalMinutes = hours * 60 + minutes
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  return `${h}:${m.toString().padStart(2, '0')}`
-}
-
-const handleDateChange = (value: { month: number; year: number }) => {
-  currentMonth.value = value.month
-  currentYear.value = value.year
-}
-
-const openDepartmentModal = () => {
-  isDepartmentModalOpen.value = true
-}
-
-const closeDepartmentModal = () => {
-  isDepartmentModalOpen.value = false
-}
-
-const handleDepartmentSelect = (department: Department) => {
-  selectedDepartment.value = department
-  loadTimesheet()
-}
-
-const clearCache = () => {
-  // Очистка кэша (если нужно)
-  console.log('Кэш очищен')
-}
-
-const refreshData = () => {
-  loadTimesheet()
-}
-
-const toggleShowEmpty = () => {
-  showEmpty.value = !showEmpty.value
-  // Логика показа пустых строк
-}
-
-const openDayDetails = (employee: EmployeeTimeData, date: string) => {
-  const timeEntry = employee.entries[date] || null
-  selectedDayData.value = {
-    employeeId: employee.employeeId,
-    employeeCode: employee.employeeCode,
-    employeeName: employee.employeeName,
-    date,
-    timeEntry: timeEntry || undefined,
-  }
-  isDayDetailsModalOpen.value = true
-}
-
-const closeDayDetailsModal = () => {
-  isDayDetailsModalOpen.value = false
-  selectedDayData.value = null
-}
-
-watch([currentMonth, currentYear], () => {
-  loadTimesheet()
-})
-
-onMounted(() => {
-  loadDepartments()
-  loadTimesheet()
-})
-</script>
 
 <style scoped>
 .compact-table-wrapper {

@@ -6,7 +6,7 @@
 
 
 <template>
-  <header class="shadow-sm bg-white dark:bg-gray fixed top-2 left-1/2 -translate-x-1/2 w-full rounded-xl max-w-[95%] transition-colors duration-300 z-50">
+  <header class="shadow-sm bg-white dark:bg-gray fixed top-2 left-1/2 -translate-x-1/2 w-full max-w-[98%] rounded-xl transition-colors duration-300 z-50">
       <nav class="flex items-center justify-between gap-2 p-2">
         <div class="flex items-center gap-2">
           <RouterLink v-for="item in menu" :key="item.path" :to="item.path" class="text-16 font-menium text-black dark:text-white hover:text-yellow transition-colors duration-300 flex items-center gap-2 py-2.5 px-3">

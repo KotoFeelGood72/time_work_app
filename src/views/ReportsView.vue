@@ -1,10 +1,10 @@
 <template>
   <div class="home-view min-h-screen bg-white dark:bg-dark transition-colors duration-300 pt-20 px-4 pb-8">
-    <!-- Фильтры -->
+    <div class="container">
+       <!-- Фильтры -->
     <div class="flex items-center gap-4 mb-6 flex-wrap">
-      <DatePicker
+      <DateSelect
         v-model="dateFilter"
-        @update:model-value="handleDateChange"
       />
 
       <button
@@ -137,36 +137,34 @@
       :time-entry="selectedDayData?.timeEntry"
       @close="closeDayDetailsModal"
     />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { fetchTimesheet, fetchDepartments } from '@/api/timesheet/api'
-import type { TimesheetData, Department, TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
+import type { TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
+import { useReportsStore, useReportsStoreRefs } from '@/stores/useReportsStore'
 import DepartmentModal from '@/components/dashboard/DepartmentModal.vue'
 import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
-import DatePicker from '@/components/dashboard/DatePicker.vue'
+import DateSelect from '@/components/dashboard/DateSelect.vue'
 import EmployeeRow from '@/components/timesheet/EmployeeRow.vue'
 import DayCell from '@/components/timesheet/DayCell.vue'
 // @ts-expect-error - типы не экспортируются правильно
 import Vue3Datatable from '@bhplugin/vue3-datatable'
 import '@bhplugin/vue3-datatable/dist/style.css'
 
-const loading = ref(false)
-const error = ref<string | null>(null)
-const timesheetData = ref<TimesheetData>({
-  departmentName: '',
-  month: new Date().getMonth() + 1,
-  year: new Date().getFullYear(),
-  employees: [],
-  workingDays: 0,
-  dailyTotals: {},
-  grandTotal: { hours: 0, minutes: 0 },
-})
+const reportsStore = useReportsStore()
+const {
+  loading,
+  error,
+  timesheetData,
+  departments,
+  selectedDepartment,
+  currentMonth,
+  currentYear,
+} = useReportsStoreRefs()
 
-const departments = ref<Department[]>([])
-const selectedDepartment = ref<Department | null>(null)
 const isDepartmentModalOpen = ref(false)
 const showEmpty = ref(false)
 
@@ -181,28 +179,26 @@ const selectedDayData = ref<{
   timeEntry?: TimeEntry
 } | null>(null)
 
-const currentMonth = ref(new Date().getMonth() + 1)
-const currentYear = ref(new Date().getFullYear())
-
 const dateFilter = computed({
   get: () => ({
     month: currentMonth.value,
     year: currentYear.value,
   }),
   set: (value: { month: number; year: number }) => {
-    currentMonth.value = value.month
-    currentYear.value = value.year
+    reportsStore.setDate(value.month, value.year)
   },
 })
 
 const daysInMonth = computed(() => {
   const days: Array<{ date: string; day: number; dayName: string }> = []
-  const daysInMonthCount = new Date(currentYear.value, currentMonth.value, 0).getDate()
+  const year = currentYear.value ?? new Date().getFullYear()
+  const month = currentMonth.value ?? new Date().getMonth() + 1
+  const daysInMonthCount = new Date(year, month, 0).getDate()
   const dayNames = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
 
   for (let day = 1; day <= daysInMonthCount; day++) {
-    const date = new Date(currentYear.value, currentMonth.value - 1, day)
-    const dateStr = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const date = new Date(year, month - 1, day)
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const dayIndex = date.getDay()
     days.push({
       date: dateStr,
@@ -281,67 +277,6 @@ const tableColumns = computed(() => {
 })
 
 
-const loadTimesheet = async () => {
-  loading.value = true
-  error.value = null
-
-  try {
-    if (typeof window !== 'undefined') {
-      const windowWithBX24 = window as Window & {
-        BX24?: {
-          init: (callback: () => void) => void
-        }
-      }
-
-      if (windowWithBX24.BX24) {
-      await new Promise<void>((resolve) => {
-          windowWithBX24.BX24!.init(() => {
-          resolve()
-        })
-      })
-      }
-    }
-
-    const result = await fetchTimesheet({
-      month: currentMonth.value,
-      year: currentYear.value,
-      departmentId: selectedDepartment.value?.id,
-      departmentName: selectedDepartment.value?.name || undefined,
-    })
-
-    timesheetData.value = result
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Ошибка при загрузке табеля'
-    console.error('Ошибка загрузки табеля:', err)
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadDepartments = async () => {
-  try {
-    if (typeof window !== 'undefined') {
-      const windowWithBX24 = window as Window & {
-        BX24?: {
-          init: (callback: () => void) => void
-        }
-      }
-
-      if (windowWithBX24.BX24) {
-        await new Promise<void>((resolve) => {
-          windowWithBX24.BX24!.init(() => {
-            resolve()
-          })
-        })
-      }
-    }
-
-    const result = await fetchDepartments()
-    departments.value = result
-  } catch (err) {
-    console.error('Ошибка загрузки подразделений:', err)
-  }
-}
 
 const getDailyTotal = (date: string): TimeEntry | null => {
   const total = timesheetData.value.dailyTotals[date]
@@ -366,11 +301,6 @@ const formatTotalTime = (hours: number, minutes: number): string => {
   return `${h}:${m.toString().padStart(2, '0')}`
 }
 
-const handleDateChange = (value: { month: number; year: number }) => {
-  currentMonth.value = value.month
-  currentYear.value = value.year
-}
-
 const openDepartmentModal = () => {
   isDepartmentModalOpen.value = true
 }
@@ -379,9 +309,9 @@ const closeDepartmentModal = () => {
   isDepartmentModalOpen.value = false
 }
 
-const handleDepartmentSelect = (department: Department) => {
-  selectedDepartment.value = department
-  loadTimesheet()
+const handleDepartmentSelect = (department: { id: string; name: string }) => {
+  reportsStore.setSelectedDepartment(department)
+  reportsStore.loadTimesheet()
 }
 
 const clearCache = () => {
@@ -390,7 +320,7 @@ const clearCache = () => {
 }
 
 const refreshData = () => {
-  loadTimesheet()
+  reportsStore.loadTimesheet()
 }
 
 const toggleShowEmpty = () => {
@@ -416,12 +346,12 @@ const closeDayDetailsModal = () => {
 }
 
 watch([currentMonth, currentYear], () => {
-  loadTimesheet()
+  reportsStore.loadTimesheet()
 })
 
 onMounted(() => {
-  loadDepartments()
-  loadTimesheet()
+  reportsStore.loadDepartments()
+  reportsStore.loadTimesheet()
 })
 </script>
 
