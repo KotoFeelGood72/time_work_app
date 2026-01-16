@@ -30,23 +30,23 @@
       {{ error }}
     </div>
 
-    <!-- Таблица -->
-    <div v-if="!loading && !error" class="overflow-x-auto">
-      <table class="w-full border-collapse bg-white dark:bg-gray rounded-lg overflow-hidden">
+    <!-- Компактная таблица -->
+    <div v-if="!loading && !error" class="overflow-x-auto compact-table-wrapper">
+      <table class="compact-timesheet-table w-full border-collapse bg-white dark:bg-gray rounded-lg overflow-hidden text-sm">
         <thead>
           <tr class="bg-gray-100 dark:bg-gray-800">
-            <th class="px-4 py-3 text-left border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold sticky left-0 bg-gray-100 dark:bg-gray-800 z-10">
+            <th class="px-2 py-1.5 text-left border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-10 min-w-[140px]">
               ФИО сотрудника
             </th>
             <th
               v-for="day in daysInMonth"
               :key="day.date"
-              class="px-2 py-3 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold min-w-[80px]"
+              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs min-w-[50px]"
             >
-              <div>{{ day.day }}</div>
-              <div class="text-12 text-gray-600 dark:text-gray-400">{{ day.dayName }}</div>
+              <div class="leading-tight">{{ day.day }}</div>
+              <div class="text-10 text-gray-600 dark:text-gray-400 leading-tight">{{ day.dayName }}</div>
             </th>
-            <th class="px-4 py-3 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold bg-gray-100 dark:bg-gray-800">
+            <th class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-100 dark:bg-gray-800 min-w-[60px]">
               Итого
             </th>
           </tr>
@@ -60,45 +60,45 @@
               selectedEmployeeId === employee.employeeId ? 'bg-yellow-100 dark:bg-yellow-900' : ''
             ]"
           >
-            <td class="px-4 py-3 border border-gray-300 dark:border-gray-600 text-black dark:text-white font-medium sticky left-0 bg-white dark:bg-gray z-10">
-              {{ employee.employeeCode }} {{ employee.employeeName }}
+            <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white font-medium text-xs sticky left-0 bg-white dark:bg-gray z-10">
+              <div class="whitespace-nowrap">{{ employee.employeeCode }} {{ employee.employeeName }}</div>
             </td>
             <td
               v-for="day in daysInMonth"
               :key="day.date"
-              class="px-2 py-3 text-center border border-gray-300 dark:border-gray-600"
+              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600"
             >
               <div
                 v-if="getTimeEntry(employee, day.date)"
                 :class="[
-                  'inline-block px-2 py-1 rounded',
+                  'inline-block px-1 py-0.5 rounded text-xs font-medium',
                   getTimeEntry(employee, day.date)?.hours === 0 && getTimeEntry(employee, day.date)?.minutes !== 0
                     ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                     : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                 ]"
               >
                 {{ formatTime(getTimeEntry(employee, day.date)!) }}
-        </div>
+              </div>
             </td>
-            <td class="px-4 py-3 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold bg-gray-50 dark:bg-gray-700">
+            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white font-semibold text-xs bg-gray-50 dark:bg-gray-700">
               {{ formatTotalTime(employee.totalHours, employee.totalMinutes) }}
             </td>
           </tr>
           <!-- Итоговая строка -->
           <tr class="bg-gray-100 dark:bg-gray-800 font-bold">
-            <td class="px-4 py-3 border border-gray-300 dark:border-gray-600 text-black dark:text-white sticky left-0 bg-gray-100 dark:bg-gray-800 z-10">
-              ИТОГО Рабочих дней: {{ timesheetData.workingDays }}
+            <td class="px-2 py-1.5 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs sticky left-0 bg-gray-100 dark:bg-gray-800 z-10">
+              <div class="text-xs">ИТОГО: {{ timesheetData.workingDays }} дн.</div>
             </td>
             <td
               v-for="day in daysInMonth"
               :key="day.date"
-              class="px-2 py-3 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white"
+              class="px-1 py-1 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs"
             >
-              <div v-if="getDailyTotal(day.date)">
+              <div v-if="getDailyTotal(day.date)" class="font-semibold">
                 {{ formatTime(getDailyTotal(day.date)!) }}
-      </div>
+              </div>
             </td>
-            <td class="px-4 py-3 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white bg-yellow-100 dark:bg-yellow-900">
+            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs bg-yellow-100 dark:bg-yellow-900 font-bold">
               {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
             </td>
           </tr>
@@ -327,3 +327,41 @@ onMounted(() => {
   loadTimesheet()
 })
 </script>
+
+<style scoped>
+.compact-table-wrapper {
+  max-height: calc(100vh - 300px);
+}
+
+.compact-timesheet-table {
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.compact-timesheet-table th,
+.compact-timesheet-table td {
+  padding: 0.25rem 0.375rem;
+}
+
+.compact-timesheet-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.compact-timesheet-table tbody tr {
+  height: auto;
+  min-height: 32px;
+}
+
+.compact-timesheet-table tbody td {
+  vertical-align: middle;
+}
+
+/* Компактные стили для ячеек с временем */
+.compact-timesheet-table .time-badge {
+  font-size: 0.7rem;
+  padding: 0.125rem 0.25rem;
+  line-height: 1.2;
+}
+</style>
