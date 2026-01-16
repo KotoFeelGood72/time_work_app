@@ -3,6 +3,9 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE, PATCH, HEAD');
 header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Authorization, Origin');
 header('Access-Control-Allow-Credentials: true');
+header('X-Frame-Options: ALLOWALL');
+header('X-Frame-Options: SAMEORIGIN');
+header('Content-Security-Policy: frame-ancestors *');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Content-Length: 0');

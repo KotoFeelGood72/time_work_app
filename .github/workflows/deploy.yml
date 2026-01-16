@@ -37,7 +37,7 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           source: "dist/*"
-          target: ${{ secrets.SERVER_PATH || '/var/www/html' }}
+          target: ${{ secrets.SERVER_PATH || '~/public_html' }}
           strip_components: 1
           rm: true
 
@@ -50,6 +50,12 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            chown -R www-data:www-data ${{ secrets.SERVER_PATH || '/var/www/html' }}
-            chmod -R 755 ${{ secrets.SERVER_PATH || '/var/www/html' }}
-            systemctl reload apache2 || true
+            DEPLOY_PATH="${{ secrets.SERVER_PATH || '~/public_html' }}"
+            # Расширяем ~ до полного пути если нужно
+            if [[ "$DEPLOY_PATH" == ~* ]]; then
+              DEPLOY_PATH="${DEPLOY_PATH/#\~/$HOME}"
+            fi
+            # Устанавливаем права (для хостинга обычно не нужен chown, только chmod)
+            chmod -R 755 "$DEPLOY_PATH" || true
+            # Перезагрузка веб-сервера (если доступно)
+            systemctl reload apache2 || systemctl reload nginx || service apache2 reload || service nginx reload || true
