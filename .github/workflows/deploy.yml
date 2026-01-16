@@ -45,7 +45,7 @@ jobs:
           echo "Целевая директория: ${SFTP_DIR}"
           echo "Локальная директория: ${LOCAL_DIR}"
           ls -la ${LOCAL_DIR}/
-          cat > /tmp/lftp_script.txt <<SCRIPT
+          lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" -p "${SFTP_PORT}" sftp://"${SFTP_SERVER}" <<LFTP_EOF
           set sftp:auto-confirm yes
           set sftp:connect-program "ssh -a -x -oStrictHostKeyChecking=no"
           set cmd:fail-exit yes
@@ -66,5 +66,4 @@ jobs:
           echo "Содержимое после копирования:"
           ls -la
           quit
-          SCRIPT
-          lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" -p "${SFTP_PORT}" sftp://"${SFTP_SERVER}" -f /tmp/lftp_script.txt
+          LFTP_EOF
