@@ -28,7 +28,7 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Deploy to server via FTP
+      - name: Deploy to server via SFTP
         uses: SamKirkland/FTP-Deploy-Action@master
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -36,8 +36,8 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: ${{ secrets.FTP_SERVER_DIR || '/public_html/' }}
           local-dir: ./dist/
-          protocol: ftp
-          port: 21
+          protocol: sftp
+          port: 22
           exclude: |
             **/.git*
             **/.git*/**
