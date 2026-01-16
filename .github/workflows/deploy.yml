@@ -39,9 +39,27 @@ jobs:
           SFTP_PORT: ${{ secrets.FTP_PORT || '22' }}
           SFTP_DIR: ${{ secrets.FTP_SERVER_DIR || 'data/www/vueapp.itcenter.pro/' }}
         run: |
+          echo "Подключение к серверу ${SFTP_SERVER}:${SFTP_PORT}"
+          echo "Пользователь: ${SFTP_USER}"
+          echo "Целевая директория: ${SFTP_DIR}"
+          echo "Локальная директория: $(pwd)/dist/"
+          ls -la ./dist/
           lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" -p "${SFTP_PORT}" sftp://"${SFTP_SERVER}" <<LFTP_EOF
           set sftp:auto-confirm yes
           set sftp:connect-program "ssh -a -x -oStrictHostKeyChecking=no"
-          mirror --reverse --delete --verbose --exclude-glob .git* --exclude-glob node_modules* ./dist/ ${SFTP_DIR}
+          set cmd:fail-exit yes
+          set ftp:list-options -a
+          echo "Текущая директория на сервере:"
+          pwd
+          echo "Переход в целевую директорию: ${SFTP_DIR}"
+          cd ${SFTP_DIR}
+          echo "Текущая директория после перехода:"
+          pwd
+          echo "Содержимое целевой директории:"
+          ls -la
+          echo "Начало копирования файлов из dist/ в ${SFTP_DIR}"
+          mirror --reverse --delete --verbose --exclude-glob .git* --exclude-glob node_modules* --exclude-glob .DS_Store ./dist/ .
+          echo "Содержимое после копирования:"
+          ls -la
           quit
           LFTP_EOF
