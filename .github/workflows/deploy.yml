@@ -37,14 +37,15 @@ jobs:
           SFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           SFTP_SERVER: ${{ secrets.FTP_SERVER }}
           SFTP_PORT: ${{ secrets.FTP_PORT || '22' }}
-          SFTP_DIR: ${{ secrets.FTP_SERVER_DIR || 'data/www/vueapp.itcenter.pro/' }}
+          SFTP_DIR: '/var/www/vueapp_itcen_usr/data/www/vueapp.itcenter.pro/'
+          LOCAL_DIR: ${{ github.workspace }}/dist
         run: |
           echo "Подключение к серверу ${SFTP_SERVER}:${SFTP_PORT}"
           echo "Пользователь: ${SFTP_USER}"
           echo "Целевая директория: ${SFTP_DIR}"
-          echo "Локальная директория: $(pwd)/dist/"
-          ls -la ./dist/
-          lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" -p "${SFTP_PORT}" sftp://"${SFTP_SERVER}" <<LFTP_EOF
+          echo "Локальная директория: ${LOCAL_DIR}"
+          ls -la ${LOCAL_DIR}/
+          cat > /tmp/lftp_script.txt <<SCRIPT
           set sftp:auto-confirm yes
           set sftp:connect-program "ssh -a -x -oStrictHostKeyChecking=no"
           set cmd:fail-exit yes
@@ -57,9 +58,13 @@ jobs:
           pwd
           echo "Содержимое целевой директории:"
           ls -la
-          echo "Начало копирования файлов из dist/ в ${SFTP_DIR}"
-          mirror --reverse --delete --verbose --exclude-glob .git* --exclude-glob node_modules* --exclude-glob .DS_Store ./dist/ .
+          echo "Начало копирования файлов из ${LOCAL_DIR}"
+          lcd ${LOCAL_DIR}
+          !pwd
+          !ls -la
+          mirror --reverse --delete --verbose --exclude-glob .git* --exclude-glob node_modules* --exclude-glob .DS_Store . .
           echo "Содержимое после копирования:"
           ls -la
           quit
-          LFTP_EOF
+          SCRIPT
+          lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" -p "${SFTP_PORT}" sftp://"${SFTP_SERVER}" -f /tmp/lftp_script.txt
