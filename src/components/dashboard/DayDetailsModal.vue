@@ -1,77 +1,149 @@
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    class="fixed inset-0 bg-gray-100 dark:bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 p-4"
     @click.self="close"
   >
     <div
-      class="bg-white dark:bg-gray rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+      class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
     >
       <!-- Заголовок -->
-      <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-        <div class="flex items-center gap-3">
-          <div class="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-sm font-semibold">
-            {{ formattedDate }}
-          </div>
-          <div class="text-black dark:text-white">
-            <div class="font-semibold">{{ employeeCode }} {{ employeeName }}</div>
-          </div>
+      <div class="flex items-start justify-between p-6 pb-4">
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-1">Upcoming</h2>
+          <p class="text-sm text-gray-400 dark:text-gray-500">{{ formattedDateLong }}</p>
         </div>
         <button
           @click="close"
-          class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-24 font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
         >
-          ×
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
 
       <!-- Загрузка -->
-      <div v-if="loading" class="p-8 text-center text-black dark:text-white">
-        Загрузка задач...
+      <div v-if="loading" class="flex-1 flex items-center justify-center p-8">
+        <div class="text-center">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-2"></div>
+          <p class="text-gray-500 dark:text-gray-400">Загрузка задач...</p>
+        </div>
       </div>
 
       <!-- Ошибка -->
-      <div v-if="error" class="p-4 text-red-600 dark:text-red-400">
+      <div v-if="error" class="p-6 text-red-600 dark:text-red-400">
         {{ error }}
       </div>
 
       <!-- Список задач -->
-      <div v-if="!loading && !error" class="flex-1 overflow-y-auto p-4">
-        <div v-if="tasks.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-8">
-          Нет задач на эту дату
+      <div v-if="!loading && !error" class="flex-1 overflow-y-auto px-6 pb-6">
+        <div v-if="tasks.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-12">
+          <p class="text-lg mb-2">Нет задач на эту дату</p>
+          <p class="text-sm">{{ employeeName }}</p>
         </div>
-        <div v-else class="space-y-3">
+        <div v-else class="space-y-6">
           <div
-            v-for="task in tasks"
+            v-for="(task, index) in tasks"
             :key="task.id"
-            class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            class="task-card"
           >
-            <!-- Время -->
-            <div
-              :class="[
-                'px-3 py-1.5 rounded font-semibold text-sm min-w-[60px] text-center',
-                task.hours === 0 && task.minutes !== 0
-                  ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-                  : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
-              ]"
-            >
-              {{ formatTaskTime(task.hours, task.minutes) }}
-            </div>
-            
-            <!-- Информация о задаче -->
-            <div class="flex-1 min-w-0">
-              <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                #{{ task.id }}<span v-if="task.project"> / {{ task.project }}</span>
+            <!-- Время и основная информация -->
+            <div class="flex items-start gap-4 mb-6">
+              <!-- Время -->
+              <div class="text-4xl font-bold text-gray-900 dark:text-white leading-none pt-1">
+                {{ formatTaskTime(task.hours, task.minutes) }}
               </div>
-              <a
-                :href="getTaskUrl(task.id)"
-                target="_blank"
-                class="text-black dark:text-white font-medium hover:underline block"
-              >
-                {{ task.title }}
-              </a>
-              <div v-if="task.description" class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                {{ task.description }}
+              
+              <!-- Вертикальная линия и описание -->
+              <div class="flex-1">
+                <div class="flex items-start gap-4">
+                  <!-- Фиолетовая вертикальная линия -->
+                  <div class="w-1 h-full min-h-[60px] bg-purple-600 rounded-full shrink-0"></div>
+                  
+                  <!-- Информация о задаче -->
+                  <div class="flex-1">
+                    <div class="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
+                      {{ task.project || 'Task' }}
+                    </div>
+                    <a
+                      :href="getTaskUrl(task.id)"
+                      target="_blank"
+                      class="text-lg font-bold text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition-colors block mb-2"
+                    >
+                      {{ task.title }}
+                    </a>
+                    <div v-if="task.description" class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                      {{ task.description }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Участники -->
+            <div v-if="index === 0" class="mb-4">
+              <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Participants:</div>
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-white text-xs font-semibold">
+                  {{ employeeName.charAt(0).toUpperCase() }}
+                </div>
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-white text-xs font-semibold">
+                  ?
+                </div>
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-white text-xs font-semibold">
+                  ?
+                </div>
+              </div>
+            </div>
+
+            <!-- Инструменты -->
+            <div v-if="index === 0" class="mb-4">
+              <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tools:</div>
+              <div class="flex items-center gap-2">
+                <div class="w-10 h-10 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm">
+                  <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+                  </svg>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm">
+                  <svg class="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M15.852 8.861h-4.588V0H8.74v8.861H4.148L0 12.26l4.148 3.399h4.592V24h2.524v-8.341h4.588L15.852 12.26 15.852 8.861z"/>
+                  </svg>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm">
+                  <svg class="w-5 h-5 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52 2.527 2.527 0 0 1 2.52 2.52zM24 15.165a2.527 2.527 0 0 1-2.52 2.523 2.527 2.527 0 0 1-2.523-2.523 2.527 2.527 0 0 1 2.523-2.52A2.528 2.528 0 0 1 24 15.165zM5.042 5.208A2.528 2.528 0 0 1 2.522 7.73 2.528 2.528 0 0 1 0 5.208 2.527 2.527 0 0 1 2.522 2.688 2.527 2.527 0 0 1 5.042 5.208z"/>
+                  </svg>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm">
+                  <svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Подзадачи -->
+            <div v-if="index === 0" class="mb-2">
+              <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subtasks:</div>
+              <div class="space-y-2">
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                  <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span class="text-sm text-blue-600 dark:text-blue-400 font-medium">Подготовить материалы</span>
+                </div>
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                  <div class="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-500 shrink-0"></div>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Получить материалы от клиента</span>
+                </div>
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                  <div class="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-500 shrink-0"></div>
+                  <span class="text-sm text-gray-400 dark:text-gray-500">Завершить задачу</span>
+                </div>
               </div>
             </div>
           </div>
@@ -81,11 +153,11 @@
       <!-- Итого -->
       <div
         v-if="!loading && !error && tasks.length > 0"
-        class="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+        class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
       >
         <div class="flex justify-between items-center">
-          <span class="font-semibold text-black dark:text-white">Итого:</span>
-          <span class="font-bold text-lg text-black dark:text-white">
+          <span class="font-semibold text-gray-700 dark:text-gray-300">Итого:</span>
+          <span class="font-bold text-lg text-gray-900 dark:text-white">
             {{ formatTotalTaskTime() }}
           </span>
         </div>
@@ -143,6 +215,19 @@ const formattedDate = computed(() => {
   const dayName = dayNames[date.getDay()]
   
   return `${day} ${month} ${dayName}`
+})
+
+const formattedDateLong = computed(() => {
+  if (!props.date) return ''
+  
+  const date = new Date(props.date)
+  const dayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+  
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const dayName = dayNames[date.getDay()]
+  
+  return `${dayName} ${day}.${month}`
 })
 
 const loadTasks = async () => {
@@ -281,5 +366,44 @@ watch([() => props.employeeId, () => props.date], () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.task-card {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgb(229 231 235);
+}
+
+.task-card:last-child {
+  border-bottom: none;
+}
+
+.dark .task-card {
+  border-bottom-color: rgb(55 65 81);
+}
+
+/* Кастомный скроллбар */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgb(209 213 219);
+  border-radius: 3px;
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgb(75 85 99);
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgb(156 163 175);
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgb(107 114 128);
 }
 </style>

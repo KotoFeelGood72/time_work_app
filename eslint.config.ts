@@ -19,5 +19,16 @@ export default defineConfigWithVueTs(
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
 
+  {
+    rules: {
+      'vue/block-order': [
+        'error',
+        {
+          order: ['script', 'template', 'style'],
+        },
+      ],
+    },
+  },
+
   skipFormatting,
 )

@@ -241,7 +241,7 @@
   </script>
 
 <template>
-  <div class="home-view min-h-screen bg-white dark:bg-dark transition-colors duration-300 pt-20 px-4 pb-8">
+  <div class="home-view min-h-screen bg-white dark:bg-dark transition-colors duration-300 pt-4 px-4 pb-8">
     <div class="flex items-center justify-between pb-8">
       <div class="flex items-center gap-4 flex-wrap">
         <DateSelect

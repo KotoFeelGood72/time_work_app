@@ -1,34 +1,43 @@
 <template>
-  <div class="flex items-center gap-2">
-    <select
-      v-model="selectedMonth"
-      @change="handleChange"
-      class="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-black dark:text-white font-semibold cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-      <option
-        v-for="month in months"
-        :key="month.value"
-        :value="month.value"
-        class="bg-white dark:bg-gray-700 text-black dark:text-white"
+  <div class="relative flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600 dark:text-gray-400">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+    <span class="text-sm font-medium text-gray-900 dark:text-white">{{ formattedDate }}</span>
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600 dark:text-gray-400">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+    <div class="absolute inset-0 flex">
+      <select
+        v-model="selectedMonth"
+        @change="handleChange"
+        class="flex-1 opacity-0 cursor-pointer"
       >
-        {{ month.label }}
-      </option>
-    </select>
-
-    <select
-      v-model="selectedYear"
-      @change="handleChange"
-      class="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-black dark:text-white font-semibold cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-      <option
-        v-for="year in years"
-        :key="year"
-        :value="year"
-        class="bg-white dark:bg-gray-700 text-black dark:text-white"
+        <option
+          v-for="month in months"
+          :key="month.value"
+          :value="month.value"
+        >
+          {{ month.label }}
+        </option>
+      </select>
+      <select
+        v-model="selectedYear"
+        @change="handleChange"
+        class="flex-1 opacity-0 cursor-pointer"
       >
-        {{ year }}
-      </option>
-    </select>
+        <option
+          v-for="year in years"
+          :key="year"
+          :value="year"
+        >
+          {{ year }}
+        </option>
+      </select>
+    </div>
   </div>
 </template>
 
@@ -45,6 +54,11 @@ const emit = defineEmits<{
 
 const selectedMonth = ref(props.modelValue.month)
 const selectedYear = ref(props.modelValue.year)
+
+const formattedDate = computed(() => {
+  const monthName = months.find(m => m.value === selectedMonth.value)?.label || ''
+  return `${monthName} ${selectedYear.value}`
+})
 
 const months = [
   { value: 1, label: 'Январь' },

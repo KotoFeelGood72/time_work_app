@@ -63,17 +63,15 @@ export const fetchTimesheet = async (
     (result) => result
   )
 
-  // Получаем данные о времени работы через timeman.timecontrol API
-  // Документация: https://apidocs.bitrix24.ru/api-reference/timeman/timecontrol/index.html
+  // Получаем данные о времени работы через timeman API
+  // ВАЖНО: timeman.status работает только для текущего пользователя без прав администратора
+  // Для получения данных других пользователей нужны права администратора
   const startDate = filters.month && filters.year
     ? new Date(filters.year, filters.month - 1, 1)
     : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   const endDate = filters.month && filters.year
     ? new Date(filters.year, filters.month, 0)
     : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-
-  const startDateStr = startDate.toISOString().split('T')[0]
-  const endDateStr = endDate.toISOString().split('T')[0]
 
   const timesheetEntries: Array<{
     EMPLOYEE_ID: string
@@ -86,121 +84,53 @@ export const fetchTimesheet = async (
     DEPARTMENT_NAME?: string
   }> = []
 
-  // Пробуем получить записи через timeman.timecontrol.list
-  // Этот метод должен возвращать список записей о рабочих днях за период
+  // Пробуем получить данные через timeman.status для текущего пользователя
+  // Без USER_ID метод возвращает данные только для текущего пользователя
   try {
-    interface TimecontrolRecord {
-      ID?: string
-      USER_ID?: string
-      DATE_START?: string
-      DATE_FINISH?: string
-      DURATION?: number
-      TIME_START?: string
-      TIME_FINISH?: string
-      STATUS?: string
-    }
-
-    interface TimecontrolListResponse {
-      result?: TimecontrolRecord[]
-      total?: number
-      next?: number
-    }
-
-    const timecontrolData = await requestWrapper<TimecontrolListResponse, TimecontrolListResponse>(
-      'timeman.timecontrol.list',
-      {
-        filter: {
-          '>=DATE_START': startDateStr,
-          '<=DATE_START': endDateStr,
-          ...(filters.departmentId && filters.departmentId !== '0' ? { DEPARTMENT_ID: filters.departmentId } : {}),
-        },
-        select: ['ID', 'USER_ID', 'DATE_START', 'DATE_FINISH', 'DURATION', 'TIME_START', 'TIME_FINISH', 'STATUS'],
-      },
+    const statusData = await requestWrapper<TimemanStatusData, TimemanStatusData>(
+      'timeman.status',
+      {},
       (result) => result
     )
 
-    if (timecontrolData?.result && Array.isArray(timecontrolData.result)) {
-      // Создаем мапу пользователей для быстрого доступа к именам
-      const usersMap = new Map(users.map(u => [u.ID, u]))
+    if (statusData) {
+      const result = statusData.result || statusData
+      const timeData = statusData.time
 
-      timecontrolData.result.forEach((record) => {
-        if (!record.USER_ID || !record.DATE_START) return
-
-        const user = usersMap.get(record.USER_ID)
-        if (!user) return
-
-        const dateStr = record.DATE_START.split('T')[0]
-        if (!dateStr) return
-
-        // Получаем duration в секундах
-        const durationSeconds = record.DURATION || 0
-
-        if (durationSeconds > 0) {
-          const hours = Math.floor(durationSeconds / 3600)
-          const minutes = Math.floor((durationSeconds % 3600) / 60)
-
-          if (hours > 0 || minutes > 0) {
-            timesheetEntries.push({
-              EMPLOYEE_ID: record.USER_ID,
-              EMPLOYEE_NAME: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || record.USER_ID,
-              EMPLOYEE_CODE: `#${record.USER_ID}`,
-              DATE: dateStr,
-              HOURS: hours,
-              MINUTES: minutes,
-            })
-          }
+      let dateStart: Date | null = null
+      if (result.date_start) {
+        if (typeof result.date_start === 'string') {
+          dateStart = new Date(result.date_start)
+        } else if (typeof result.date_start === 'number') {
+          dateStart = new Date(result.date_start * 1000)
         }
-      })
-    }
-  } catch (error) {
-    console.warn('Не удалось получить данные через timeman.timecontrol.list, пробуем альтернативный метод:', error)
+      } else if (timeData?.start) {
+        dateStart = new Date(timeData.start * 1000)
+      } else if (result.start) {
+        dateStart = new Date(result.start * 1000)
+      }
 
-    // Fallback: пробуем timeman.timecontrol.get для каждого пользователя
-    // или используем timeman.status если timecontrol недоступен
-    for (const user of users) {
-      try {
-        const statusData = await requestWrapper<TimemanStatusData, TimemanStatusData>(
-          'timeman.status',
-          {
-            ...(user.ID ? { USER_ID: user.ID } : {}),
-          },
-          (result) => result
-        )
+      if (dateStart && !isNaN(dateStart.getTime()) && dateStart >= startDate && dateStart <= endDate) {
+        const dateStr = dateStart.toISOString().split('T')[0]
+        if (dateStr) {
+          const durationSeconds = result.duration || timeData?.duration || 0
+          const operatingSeconds = result.operating || 0
+          const actualDuration = durationSeconds > 0 ? durationSeconds : operatingSeconds
 
-        if (statusData) {
-          const result = statusData.result || statusData
-          const timeData = statusData.time
+          if (actualDuration > 0) {
+            const hours = Math.floor(actualDuration / 3600)
+            const minutes = Math.floor((actualDuration % 3600) / 60)
 
-          let dateStart: Date | null = null
-          if (result.date_start) {
-            if (typeof result.date_start === 'string') {
-              dateStart = new Date(result.date_start)
-            } else if (typeof result.date_start === 'number') {
-              dateStart = new Date(result.date_start * 1000)
-            }
-          } else if (timeData?.start) {
-            dateStart = new Date(timeData.start * 1000)
-          } else if (result.start) {
-            dateStart = new Date(result.start * 1000)
-          }
+            if (hours > 0 || minutes > 0) {
+              // Получаем ID текущего пользователя из ответа или используем первый из списка
+              const currentUserId = users[0]?.ID || ''
+              const currentUser = users.find(u => u.ID === currentUserId) || users[0]
 
-          if (dateStart && !isNaN(dateStart.getTime()) && dateStart >= startDate && dateStart <= endDate) {
-            const dateStr = dateStart.toISOString().split('T')[0]
-            if (!dateStr) continue
-
-            const durationSeconds = result.duration || timeData?.duration || 0
-            const operatingSeconds = result.operating || 0
-            const actualDuration = durationSeconds > 0 ? durationSeconds : operatingSeconds
-
-            if (actualDuration > 0) {
-              const hours = Math.floor(actualDuration / 3600)
-              const minutes = Math.floor((actualDuration % 3600) / 60)
-
-              if (hours > 0 || minutes > 0) {
+              if (currentUser) {
                 timesheetEntries.push({
-                  EMPLOYEE_ID: user.ID,
-                  EMPLOYEE_NAME: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
-                  EMPLOYEE_CODE: `#${user.ID}`,
+                  EMPLOYEE_ID: currentUser.ID,
+                  EMPLOYEE_NAME: `${currentUser.NAME || ''} ${currentUser.LAST_NAME || ''}`.trim() || currentUser.ID,
+                  EMPLOYEE_CODE: `#${currentUser.ID}`,
                   DATE: dateStr,
                   HOURS: hours,
                   MINUTES: minutes,
@@ -209,10 +139,11 @@ export const fetchTimesheet = async (
             }
           }
         }
-      } catch (userError) {
-        console.debug(`Не удалось получить данные для пользователя ${user.ID}:`, userError)
       }
     }
+  } catch (error) {
+    console.warn('Не удалось получить данные через timeman.status:', error)
+    // Если метод недоступен, продолжаем с пустыми данными
   }
 
   // Если получили данные через timeman, преобразуем их

@@ -1,146 +1,3 @@
-<template>
-  <div class="home-view min-h-screen bg-white dark:bg-dark transition-colors duration-300 pt-20 px-4 pb-8">
-    <div class="container">
-       <!-- Фильтры -->
-    <div class="flex items-center gap-4 mb-6 flex-wrap">
-      <DateSelect
-        v-model="dateFilter"
-      />
-
-      <button
-        @click="openDepartmentModal"
-        class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-black dark:text-white rounded-lg font-semibold transition-colors"
-      >
-        {{ selectedDepartment?.name || 'ПОДРАЗДЕЛЕНИЕ' }}
-      </button>
-    </div>
-
-    <!-- Заголовок подразделения -->
-    <h2 v-if="timesheetData.departmentName" class="text-24 font-bold text-black dark:text-white mb-4">
-      {{ timesheetData.departmentName }}
-    </h2>
-
-    <!-- Загрузка -->
-    <div v-if="loading" class="text-18 text-black dark:text-white">
-      Загрузка...
-    </div>
-
-    <!-- Ошибка -->
-    <div v-if="error" class="text-red-600 dark:text-red-400 mb-4">
-      {{ error }}
-    </div>
-
-    <!-- Таблица с vue3-datatable -->
-    <div v-if="!loading && !error" class="timesheet-table-wrapper">
-      <!-- Отладочная информация -->
-      <div v-if="tableRows.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
-        Нет данных для отображения. Загружено сотрудников: {{ timesheetData.employees.length }}
-      </div>
-
-      <Vue3Datatable
-        v-else
-        :rows="tableRows"
-        :columns="tableColumns"
-        :loading="loading"
-        :isServerMode="false"
-        :pagination="true"
-        :sortable="true"
-        skin="bh-table-striped bh-table-hover"
-      >
-        <!-- Слот для колонки с именем сотрудника -->
-        <template #employee="props">
-          <EmployeeRow :employee="props.value || props.data" />
-        </template>
-
-        <!-- Слоты для колонок дней -->
-        <template
-          v-for="day in daysInMonth"
-          :key="day.date"
-          #[`day_${day.date}`]="props"
-        >
-          <DayCell
-            :employee="props.value || props.data"
-            :date="day.date"
-            :time-entry="(props.value || props.data).entries[day.date] || null"
-            @click="openDayDetails"
-          />
-        </template>
-
-        <!-- Слот для колонки итого -->
-        <template #total="props">
-          <div class="px-2 py-1.5 text-center text-black dark:text-white font-semibold text-xs">
-            {{ formatTotalTime((props.value || props.data).totalHours, (props.value || props.data).totalMinutes) }}
-          </div>
-        </template>
-      </Vue3Datatable>
-
-      <!-- Итоговая строка -->
-      <div v-if="timesheetData.employees.length > 0" class="total-row bg-gray-100 dark:bg-gray-800 font-bold border-t border-gray-300 dark:border-gray-600">
-        <div class="grid gap-0" :style="{ gridTemplateColumns: `140px repeat(${daysInMonth.length}, 50px) 60px` }">
-          <div class="px-2 py-1.5 text-black dark:text-white text-xs border-r border-gray-300 dark:border-gray-600">
-            ИТОГО: {{ timesheetData.workingDays }} дн.
-          </div>
-          <div
-            v-for="day in daysInMonth"
-            :key="day.date"
-            class="px-1 py-1 text-center text-black dark:text-white text-xs border-r border-gray-300 dark:border-gray-600"
-          >
-            <div v-if="getDailyTotal(day.date)" class="font-semibold">
-              {{ formatTime(getDailyTotal(day.date)!) }}
-            </div>
-          </div>
-          <div class="px-2 py-1.5 text-center text-black dark:text-white text-xs bg-yellow-100 dark:bg-yellow-900 font-bold">
-            {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Кнопки действий -->
-    <div class="flex items-center gap-4 mt-6">
-      <button
-        @click="clearCache"
-        class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
-      >
-        Сбросить кэш
-      </button>
-      <button
-        @click="refreshData"
-        class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-black dark:text-white rounded-lg font-semibold transition-colors"
-      >
-        Обновить
-      </button>
-      <button
-        @click="toggleShowEmpty"
-        class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-black dark:text-white rounded-lg font-semibold transition-colors"
-      >
-        Показать пустые
-      </button>
-    </div>
-
-    <!-- Модальное окно выбора подразделения -->
-    <DepartmentModal
-      :is-open="isDepartmentModalOpen"
-      :departments="departments"
-      :selected-department-id="selectedDepartment?.id"
-      @close="closeDepartmentModal"
-      @select="handleDepartmentSelect"
-    />
-
-    <!-- Модальное окно деталей дня -->
-    <DayDetailsModal
-      :is-open="isDayDetailsModalOpen"
-      :employee-id="selectedDayData?.employeeId || ''"
-      :employee-code="selectedDayData?.employeeCode || ''"
-      :employee-name="selectedDayData?.employeeName || ''"
-      :date="selectedDayData?.date || ''"
-      :time-entry="selectedDayData?.timeEntry"
-      @close="closeDayDetailsModal"
-    />
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import type { TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
@@ -150,6 +7,8 @@ import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
 import DateSelect from '@/components/dashboard/DateSelect.vue'
 import EmployeeRow from '@/components/timesheet/EmployeeRow.vue'
 import DayCell from '@/components/timesheet/DayCell.vue'
+import PageHead from '@/components/ui/head/PageHead.vue'
+import ButtonComponent from '@/components/ui/buttons/ButtonComponent.vue'
 // @ts-expect-error - типы не экспортируются правильно
 import Vue3Datatable from '@bhplugin/vue3-datatable'
 import '@bhplugin/vue3-datatable/dist/style.css'
@@ -355,7 +214,223 @@ onMounted(() => {
 })
 </script>
 
+<template>
+  <div class="reports-view min-h-screen bg-gray-50 dark:bg-gray-900 pt-4 px-6 pb-8">
+    <PageHead title="Отчеты" class="pb-6">
+      <template #actions>
+        <div class="flex items-center gap-3">
+        <span class="text-sm text-gray-600 dark:text-gray-400">Подразделение:</span>
+        <!-- <button
+          @click="openDepartmentModal"
+          class="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-semibold text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          {{ selectedDepartment?.name || 'ВСЕ ПОДРАЗДЕЛЕНИЯ' }}
+        </button> -->
+        <ButtonComponent
+          :text="selectedDepartment?.name || 'ВСЕ ПОДРАЗДЕЛЕНИЯ'"
+          @click="openDepartmentModal"
+        />
+      </div>
+
+      <DateSelect
+        v-model="dateFilter"
+      />
+      </template>
+    </PageHead>
+
+    <!-- Загрузка -->
+    <div v-if="loading" class="text-18 text-black dark:text-white">
+      Загрузка...
+    </div>
+
+    <!-- Ошибка -->
+    <div v-if="error" class="text-red-600 dark:text-red-400 mb-4">
+      {{ error }}
+    </div>
+
+    <!-- Таблица с vue3-datatable -->
+    <div v-if="!loading && !error" class="timesheet-table-wrapper relative bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
+      <!-- Отладочная информация -->
+      <div v-if="tableRows.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
+        Нет данных для отображения. Загружено сотрудников: {{ timesheetData.employees.length }}
+      </div>
+
+      <Vue3Datatable
+        v-else
+        :rows="tableRows"
+        :columns="tableColumns"
+        :loading="loading"
+        :isServerMode="false"
+        :pagination="true"
+        :sortable="true"
+        skin="bh-table-striped bh-table-hover"
+        class="reports-table"
+      >
+        <!-- Слот для колонки с именем сотрудника -->
+        <template #employee="props">
+          <EmployeeRow :employee="props.value || props.data" />
+        </template>
+
+        <!-- Слоты для колонок дней -->
+        <template
+          v-for="day in daysInMonth"
+          :key="day.date"
+          #[`day_${day.date}`]="props"
+        >
+          <DayCell
+            :employee="props.value || props.data"
+            :date="day.date"
+            :time-entry="(props.value || props.data).entries[day.date] || null"
+            @click="openDayDetails"
+          />
+        </template>
+
+        <!-- Слот для колонки итого -->
+        <template #total="props">
+          <div class="px-2 py-1.5 text-center text-black dark:text-white font-semibold text-xs">
+            {{ formatTotalTime((props.value || props.data).totalHours, (props.value || props.data).totalMinutes) }}
+          </div>
+        </template>
+      </Vue3Datatable>
+
+      <!-- Итоговая строка -->
+      <div v-if="timesheetData.employees.length > 0" class="total-row bg-gray-50 dark:bg-gray-800 font-bold border-t border-gray-200 dark:border-gray-700">
+        <div class="grid gap-0" :style="{ gridTemplateColumns: `140px repeat(${daysInMonth.length}, 50px) 60px` }">
+          <div class="px-4 py-3 text-gray-700 dark:text-gray-300 text-sm border-r border-gray-200 dark:border-gray-700">
+            ИТОГО: {{ timesheetData.workingDays }} дн.
+          </div>
+          <div
+            v-for="day in daysInMonth"
+            :key="day.date"
+            class="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-sm border-r border-gray-200 dark:border-gray-700"
+          >
+            <div v-if="getDailyTotal(day.date)" class="font-semibold">
+              {{ formatTime(getDailyTotal(day.date)!) }}
+            </div>
+          </div>
+          <div class="px-4 py-3 text-center text-gray-900 dark:text-white text-sm bg-yellow-100 dark:bg-yellow-900/30 font-bold">
+            {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Кнопки действий -->
+    <div class="flex items-center gap-2 pt-6">
+      <ButtonComponent
+        text="Сбросить кэш"
+        variant="primary"
+        @click="clearCache"
+      />
+      <ButtonComponent
+        text="Обновить"
+        @click="refreshData"
+      />
+      <ButtonComponent
+        text="Показать пустые"
+        @click="toggleShowEmpty"
+      />
+    </div>
+
+    <!-- Модальное окно выбора подразделения -->
+    <DepartmentModal
+      :is-open="isDepartmentModalOpen"
+      :departments="departments"
+      :selected-department-id="selectedDepartment?.id"
+      @close="closeDepartmentModal"
+      @select="handleDepartmentSelect"
+    />
+
+    <!-- Модальное окно деталей дня -->
+    <DayDetailsModal
+      :is-open="isDayDetailsModalOpen"
+      :employee-id="selectedDayData?.employeeId || ''"
+      :employee-code="selectedDayData?.employeeCode || ''"
+      :employee-name="selectedDayData?.employeeName || ''"
+      :date="selectedDayData?.date || ''"
+      :time-entry="selectedDayData?.timeEntry"
+      @close="closeDayDetailsModal"
+    />
+  </div>
+</template>
+
 <style scoped>
+.reports-view {
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Стили для таблицы в стиле GanttChart */
+.timesheet-table-wrapper {
+  border: 1px solid rgb(229 231 235);
+}
+
+.dark .timesheet-table-wrapper {
+  border-color: rgb(55 65 81);
+}
+
+.reports-table :deep(.bh-table-striped) {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.reports-table :deep(.bh-table-striped thead th) {
+  background-color: rgb(249 250 251) !important;
+  border-bottom: 1px solid rgb(229 231 235);
+  border-right: 1px solid rgb(229 231 235);
+  padding: 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: rgb(55 65 75);
+  text-align: left;
+}
+
+.dark .reports-table :deep(.bh-table-striped thead th) {
+  background-color: rgb(31 41 55) !important;
+  border-color: rgb(55 65 81);
+  color: rgb(209 213 219);
+}
+
+.reports-table :deep(.bh-table-striped tbody td) {
+  border-bottom: 1px solid rgb(229 231 235);
+  border-right: 1px solid rgb(229 231 235);
+  padding: 1rem;
+  background-color: white;
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody td) {
+  border-color: rgb(55 65 81);
+  background-color: rgb(17 24 39);
+}
+
+.reports-table :deep(.bh-table-striped tbody tr:nth-child(even) td) {
+  background-color: rgb(249 250 251);
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody tr:nth-child(even) td) {
+  background-color: rgb(31 41 55);
+}
+
+/* При наведении на строку - светлый фон для всех ячеек */
+.reports-table :deep(.bh-table-hover tbody tr:hover td) {
+  background-color: rgb(249 250 251) !important;
+}
+
+.dark .reports-table :deep(.bh-table-hover tbody tr:hover td) {
+  background-color: rgb(31 41 55) !important;
+}
+
+/* При наведении на конкретную ячейку - более темный фон, чем строка */
+.reports-table :deep(.bh-table-hover tbody tr:hover td:hover) {
+  background-color: rgb(243 244 246) !important;
+}
+
+.dark .reports-table :deep(.bh-table-hover tbody tr:hover td:hover) {
+  background-color: rgb(55 65 81) !important;
+}
+
 .compact-table-wrapper {
   max-height: 70vh;
   overflow: auto;
