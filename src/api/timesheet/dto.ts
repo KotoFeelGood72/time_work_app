@@ -45,3 +45,38 @@ export interface TimemanStatusData {
   finish?: number
   operating_reset_at?: number
 }
+
+// DTO для записей табеля времени через timeman.record.list
+export interface TimemanRecord {
+  ID: string
+  USER_ID: string
+  DATE_START?: string
+  DATE_FINISH?: string
+  TIME_START?: string
+  TIME_FINISH?: string
+  DURATION?: number // в секундах или минутах
+  DURATION_HOURS?: number
+  DURATION_MINUTES?: number
+}
+
+// DTO для записей рабочего времени через timeman.worktime.list
+export interface TimemanWorktime {
+  USER_ID: string
+  DATE?: string
+  DATE_START?: string
+  DURATION?: number
+  HOURS?: number
+  MINUTES?: number
+}
+
+// DTO для записей времени, затраченного на задачи через tasks.elapseditem.getlist
+export interface TaskElapsedItem {
+  ID: string
+  TASK_ID: string
+  USER_ID: string
+  SECONDS?: number // время в секундах
+  MINUTES?: number // время в минутах
+  CREATED_DATE?: string // дата создания записи
+  DATE_START?: string // дата начала работы
+  COMMENT_TEXT?: string
+}
