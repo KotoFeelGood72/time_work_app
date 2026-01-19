@@ -95,14 +95,16 @@ export const fetchTimesheet = async (
       departmentName: filters.departmentName || 'Все подразделения',
       month: filters.month || new Date().getMonth() + 1,
       year: filters.year || new Date().getFullYear(),
-      employees: users.map((user) => ({
-        employeeId: '', // ВРЕМЕННО: закомментировано user.ID
-        employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
-        employeeCode: `#${user.ID}`,
-        entries: {},
-        totalHours: 0,
-        totalMinutes: 0,
-      })),
+      // ВРЕМЕННО: закомментировано
+      // employees: users.map((user) => ({
+      //   employeeId: '', // ВРЕМЕННО: закомментировано user.ID
+      //   employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
+      //   employeeCode: `#${user.ID}`,
+      //   entries: {},
+      //   totalHours: 0,
+      //   totalMinutes: 0,
+      // })),
+      employees: [],
       workingDays: 0,
       dailyTotals: {},
       grandTotal: { hours: 0, minutes: 0 },
