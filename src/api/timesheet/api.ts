@@ -95,106 +95,6 @@ export const fetchTimesheet = async (
   const startDateStr = startDate.toISOString().split('T')[0] || ''
   const endDateStr = endDate.toISOString().split('T')[0] || ''
 
-  // ПРИОРИТЕТ 0: Пробуем получить данные через timeman.timecontrol.reports.get
-  // Это наиболее точный метод для получения данных о времени работы сотрудников
-  // Документация: https://apidocs.bitrix24.com/api-reference/timeman/timecontrol/timeman-timecontrol-reports-get.html
-  try {
-    console.log('[Timesheet API] Пробуем получить данные через timeman.timecontrol.reports.get...')
-
-    // Получаем отчеты для каждого пользователя
-    const reportPromises = users.map(async (user) => {
-      try {
-        const report = await requestWrapper<TimemanTimecontrolReport, TimemanTimecontrolReport>(
-          'timeman.timecontrol.reports.get',
-          {
-            USER_ID: parseInt(user.ID, 10),
-            MONTH: filters.month || new Date().getMonth() + 1,
-            YEAR: filters.year || new Date().getFullYear(),
-            WORKDAY_HOURS: 8, // Стандартный рабочий день 8 часов
-          },
-          (result) => result
-        )
-
-        return { userId: user.ID, report }
-      } catch (error) {
-        console.warn(`[Timesheet API] Не удалось получить отчет для пользователя ${user.ID}:`, error)
-        return { userId: user.ID, report: null }
-      }
-    })
-
-    const reportsResults = await Promise.all(reportPromises)
-    let reportsCount = 0
-
-    reportsResults.forEach(({ userId, report }) => {
-      if (!report?.result?.report?.days) return
-
-      const user = users.find((u) => u.ID === userId)
-      if (!user) return
-
-      report.result.report.days.forEach((day) => {
-        // Извлекаем дату из index (формат YYYYMMDD) или day_title
-        let recordDate = ''
-        if (day.index && day.index.length === 8) {
-          // Формат YYYYMMDD
-          const year = day.index.substring(0, 4)
-          const month = day.index.substring(4, 6)
-          const date = day.index.substring(6, 8)
-          recordDate = `${year}-${month}-${date}`
-        } else if (day.workday_date_start) {
-          const tParts = day.workday_date_start.split('T')
-          const spaceParts = day.workday_date_start.split(' ')
-          const datePart = (tParts[0] || spaceParts[0] || '').trim()
-          if (datePart) {
-            recordDate = datePart
-          }
-        } else if (day.day_title) {
-          // Формат MM/DD/YYYY
-          const parts = day.day_title.split('/')
-          if (parts.length === 3) {
-            const month = parts[0]?.trim()
-            const date = parts[1]?.trim()
-            const year = parts[2]?.trim()
-            if (month && date && year) {
-              recordDate = `${year}-${month.padStart(2, '0')}-${date.padStart(2, '0')}`
-            }
-          }
-        }
-
-        if (!recordDate || recordDate < startDateStr || recordDate > endDateStr) return
-
-        // Используем workday_duration_final или workday_duration (в секундах)
-        const durationSeconds = day.workday_duration_final || day.workday_duration || 0
-
-        if (durationSeconds > 0) {
-          const hours = Math.floor(durationSeconds / 3600)
-          const minutes = Math.floor((durationSeconds % 3600) / 60)
-
-          if (hours > 0 || minutes > 0) {
-            timesheetEntries.push({
-              ID: `${userId}_${recordDate}`,
-              EMPLOYEE_ID: userId,
-              EMPLOYEE_NAME: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || userId,
-              EMPLOYEE_CODE: `#${userId}`,
-              DATE: recordDate,
-              HOURS: hours,
-              MINUTES: minutes,
-            })
-            reportsCount++
-          }
-        }
-      })
-    })
-
-    if (reportsCount > 0) {
-      console.log(`[Timesheet API] Получено ${reportsCount} записей через timeman.timecontrol.reports.get`)
-    } else {
-      console.log('[Timesheet API] timeman.timecontrol.reports.get вернул пустой результат')
-    }
-  } catch (error) {
-    console.warn('[Timesheet API] Не удалось получить данные через timeman.timecontrol.reports.get:', error)
-    // Пробуем альтернативные методы
-  }
-
   if (!startDateStr || !endDateStr) {
     console.error('Не удалось определить даты для запроса')
     // Возвращаем пустую структуру
@@ -228,6 +128,119 @@ export const fetchTimesheet = async (
     DEPARTMENT_ID?: string
     DEPARTMENT_NAME?: string
   }> = []
+
+  // ПРИОРИТЕТ 0: Пробуем получить данные через timeman.timecontrol.reports.get
+  // Это наиболее точный метод для получения данных о времени работы сотрудников
+  // Документация: https://apidocs.bitrix24.com/api-reference/timeman/timecontrol/timeman-timecontrol-reports-get.html
+  try {
+    console.log('[Timesheet API] Пробуем получить данные через timeman.timecontrol.reports.get...')
+
+    // Получаем текущего пользователя
+    interface CurrentUser {
+      ID: string
+      NAME?: string
+      LAST_NAME?: string
+    }
+
+    let currentUser: CurrentUser | null = null
+    try {
+      const currentUserResult = await requestWrapper<CurrentUser, CurrentUser>(
+        'user.current',
+        {},
+        (result) => result
+      )
+      currentUser = currentUserResult
+      console.log(`[Timesheet API] Текущий пользователь: ${currentUser.ID}`)
+    } catch (error) {
+      console.warn('[Timesheet API] Не удалось получить текущего пользователя:', error)
+    }
+
+    // Запрашиваем данные только для текущего пользователя
+    if (currentUser) {
+      try {
+        const report = await requestWrapper<TimemanTimecontrolReport, TimemanTimecontrolReport>(
+          'timeman.timecontrol.reports.get',
+          {
+            USER_ID: parseInt(currentUser.ID, 10),
+            MONTH: filters.month || new Date().getMonth() + 1,
+            YEAR: filters.year || new Date().getFullYear(),
+            WORKDAY_HOURS: 8,
+          },
+          (result) => result
+        )
+
+        let reportsCount = 0
+
+        if (report?.result?.report?.days) {
+          report.result.report.days.forEach((day) => {
+            // Извлекаем дату из index (формат YYYYMMDD) или day_title
+            let recordDate = ''
+            if (day.index && day.index.length === 8) {
+              // Формат YYYYMMDD
+              const year = day.index.substring(0, 4)
+              const month = day.index.substring(4, 6)
+              const date = day.index.substring(6, 8)
+              recordDate = `${year}-${month}-${date}`
+            } else if (day.workday_date_start) {
+              const tParts = day.workday_date_start.split('T')
+              const spaceParts = day.workday_date_start.split(' ')
+              const datePart = (tParts[0] || spaceParts[0] || '').trim()
+              if (datePart) {
+                recordDate = datePart
+              }
+            } else if (day.day_title) {
+              // Формат MM/DD/YYYY
+              const parts = day.day_title.split('/')
+              if (parts.length === 3) {
+                const month = parts[0]?.trim()
+                const date = parts[1]?.trim()
+                const year = parts[2]?.trim()
+                if (month && date && year) {
+                  recordDate = `${year}-${month.padStart(2, '0')}-${date.padStart(2, '0')}`
+                }
+              }
+            }
+
+            if (!recordDate || recordDate < startDateStr || recordDate > endDateStr) return
+
+            // Используем workday_duration_final или workday_duration (в секундах)
+            const durationSeconds = day.workday_duration_final || day.workday_duration || 0
+
+            if (durationSeconds > 0) {
+              const hours = Math.floor(durationSeconds / 3600)
+              const minutes = Math.floor((durationSeconds % 3600) / 60)
+
+              if (hours > 0 || minutes > 0) {
+                timesheetEntries.push({
+                  ID: `${currentUser.ID}_${recordDate}`,
+                  EMPLOYEE_ID: currentUser.ID,
+                  EMPLOYEE_NAME: `${currentUser.NAME || ''} ${currentUser.LAST_NAME || ''}`.trim() || currentUser.ID,
+                  EMPLOYEE_CODE: `#${currentUser.ID}`,
+                  DATE: recordDate,
+                  HOURS: hours,
+                  MINUTES: minutes,
+                })
+                reportsCount++
+              }
+            }
+          })
+
+          if (reportsCount > 0) {
+            console.log(`[Timesheet API] Получено ${reportsCount} записей через timeman.timecontrol.reports.get для текущего пользователя`)
+          } else {
+            console.log('[Timesheet API] timeman.timecontrol.reports.get вернул пустой результат для текущего пользователя')
+          }
+        }
+      } catch (error) {
+        console.warn(`[Timesheet API] Не удалось получить отчет для текущего пользователя ${currentUser.ID}:`, error)
+      }
+    } else {
+      console.log('[Timesheet API] Текущий пользователь не найден, пропускаем timeman.timecontrol.reports.get')
+    }
+  } catch (error) {
+    console.warn('[Timesheet API] Не удалось получить данные через timeman.timecontrol.reports.get:', error)
+    // Пробуем альтернативные методы
+  }
 
   // ПРИОРИТЕТ 1: Пробуем получить данные через tasks.elapseditem.getlist
   // Это наиболее надежный способ получения времени работы сотрудников через время, затраченное на задачи
