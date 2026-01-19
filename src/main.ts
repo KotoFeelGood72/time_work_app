@@ -6,6 +6,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { initBitrix24Mock } from './mocks/bitrix24-mock'
+import b24UiPlugin from '@bitrix24/b24ui-nuxt/vue-plugin'
 
 // Инициализируем мок BX24 для локальной разработки
 // Мок загружается только если реальный BX24 не доступен
@@ -26,6 +27,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 const app = createApp(App)
 
 app.use(createPinia())
+app.use(b24UiPlugin)
 app.use(router)
 
 app.mount('#app')

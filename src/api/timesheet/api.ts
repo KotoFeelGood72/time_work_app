@@ -57,13 +57,20 @@ export const fetchTimesheet = async (
     }
   }
 
-  // ВРЕМЕННО: Получаем данные только для пользователя с ID 812
-  const userFilter: Record<string, unknown> = { ID: '812' }
-
   interface UserForTimesheet {
     ID: string
     NAME?: string
     LAST_NAME?: string
+  }
+
+  // Формируем фильтр для получения пользователей
+  const userFilter: Record<string, unknown> = {
+    ACTIVE: true, // Получаем только активных пользователей
+  }
+
+  // Добавляем фильтр по подразделению, если он указан
+  if (filters.departmentId && filters.departmentId !== '0') {
+    userFilter.UF_DEPARTMENT = filters.departmentId
   }
 
   const users = await requestWrapper<UserForTimesheet[], UserForTimesheet[]>(
@@ -95,16 +102,14 @@ export const fetchTimesheet = async (
       departmentName: filters.departmentName || 'Все подразделения',
       month: filters.month || new Date().getMonth() + 1,
       year: filters.year || new Date().getFullYear(),
-      // ВРЕМЕННО: закомментировано
-      // employees: users.map((user) => ({
-      //   employeeId: '', // ВРЕМЕННО: закомментировано user.ID
-      //   employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
-      //   employeeCode: `#${user.ID}`,
-      //   entries: {},
-      //   totalHours: 0,
-      //   totalMinutes: 0,
-      // })),
-      employees: [],
+      employees: users.map((user) => ({
+        employeeId: user.ID,
+        employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
+        employeeCode: `#${user.ID}`,
+        entries: {},
+        totalHours: 0,
+        totalMinutes: 0,
+      })),
       workingDays: 0,
       dailyTotals: {},
       grandTotal: { hours: 0, minutes: 0 },
@@ -129,16 +134,13 @@ export const fetchTimesheet = async (
   try {
     console.log('[Timesheet API] Пробуем получить данные через timeman.timecontrol.reports.get...')
 
-    // ВРЕМЕННО: Используем пользователя с ID 812
-    const targetUserId = '812'
-    const targetUser = users.find(u => u.ID === targetUserId)
-
-    if (targetUser) {
+    // Получаем данные для всех пользователей
+    for (const user of users) {
       try {
         const report = await requestWrapper<TimemanTimecontrolReport, TimemanTimecontrolReport>(
           'timeman.timecontrol.reports.get',
           {
-            USER_ID: parseInt(targetUserId, 10),
+            USER_ID: parseInt(user.ID, 10),
             MONTH: filters.month || new Date().getMonth() + 1,
             YEAR: filters.year || new Date().getFullYear(),
             WORKDAY_HOURS: 8,
@@ -189,10 +191,10 @@ export const fetchTimesheet = async (
 
               if (hours > 0 || minutes > 0) {
                 timesheetEntries.push({
-                  ID: `${targetUserId}_${recordDate}`,
-                  EMPLOYEE_ID: targetUserId,
-                  EMPLOYEE_NAME: `${targetUser.NAME || ''} ${targetUser.LAST_NAME || ''}`.trim() || targetUserId,
-                  EMPLOYEE_CODE: `#${targetUserId}`,
+                  ID: `${user.ID}_${recordDate}`,
+                  EMPLOYEE_ID: user.ID,
+                  EMPLOYEE_NAME: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
+                  EMPLOYEE_CODE: `#${user.ID}`,
                   DATE: recordDate,
                   HOURS: hours,
                   MINUTES: minutes,
@@ -203,16 +205,12 @@ export const fetchTimesheet = async (
           })
 
           if (reportsCount > 0) {
-            console.log(`[Timesheet API] Получено ${reportsCount} записей через timeman.timecontrol.reports.get для пользователя ${targetUserId}`)
-          } else {
-            console.log(`[Timesheet API] timeman.timecontrol.reports.get вернул пустой результат для пользователя ${targetUserId}`)
+            console.log(`[Timesheet API] Получено ${reportsCount} записей через timeman.timecontrol.reports.get для пользователя ${user.ID}`)
           }
         }
       } catch (error) {
-        console.warn(`[Timesheet API] Не удалось получить отчет для пользователя ${targetUserId}:`, error)
+        console.warn(`[Timesheet API] Не удалось получить отчет для пользователя ${user.ID}:`, error)
       }
-    } else {
-      console.log(`[Timesheet API] Пользователь с ID ${targetUserId} не найден, пропускаем timeman.timecontrol.reports.get`)
     }
   } catch (error) {
     console.warn('[Timesheet API] Не удалось получить данные через timeman.timecontrol.reports.get:', error)
@@ -223,15 +221,12 @@ export const fetchTimesheet = async (
   if (timesheetEntries.length === 0) {
     try {
       console.log('[Timesheet API] Пробуем получить данные через timeman.worktime.list...')
-      // ВРЕМЕННО: Фильтруем только пользователя с ID 812
-      const targetUserId = '812'
       const worktimeRecords = await requestWrapper<TimemanWorktime[], TimemanWorktime[]>(
         'timeman.worktime.list',
         {
           filter: {
             '>=DATE': startDateStr,
             '<=DATE': endDateStr,
-            USER_ID: targetUserId,
           },
         },
         (result) => result
@@ -368,7 +363,7 @@ export const fetchTimesheet = async (
     month: filters.month || new Date().getMonth() + 1,
     year: filters.year || new Date().getFullYear(),
     employees: users.map((user) => ({
-      employeeId: '', // ВРЕМЕННО: закомментировано user.ID
+      employeeId: user.ID,
       employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
       employeeCode: `#${user.ID}`,
       entries: {},

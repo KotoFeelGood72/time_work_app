@@ -5,24 +5,21 @@ import { join } from 'path'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import bitrix24UIPluginVite from '@bitrix24/b24ui-nuxt/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
   build: {
-    // Явно очищаем папку dist перед каждой сборкой
-    // Это гарантирует, что старые файлы будут удалены
     emptyOutDir: true,
-    // Увеличиваем размер предупреждения для больших файлов
     chunkSizeWarningLimit: 1000,
   },
   plugins: [
     vue(),
     vueDevTools(),
+    bitrix24UIPluginVite(),
     {
       name: 'copy-php-files',
       closeBundle() {
-        // Копируем install.php в dist после сборки
-        // Это происходит после очистки dist, поэтому старые версии будут заменены
         const distPath = join(process.cwd(), 'dist')
         const publicPath = join(process.cwd(), 'public')
 
