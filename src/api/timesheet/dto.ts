@@ -46,7 +46,7 @@ export interface TimemanStatusData {
   operating_reset_at?: number
 }
 
-// DTO для записей табеля времени через timeman.record.list
+// DTO для записей табеля времени (не используется, оставлено для совместимости)
 export interface TimemanRecord {
   ID: string
   USER_ID: string

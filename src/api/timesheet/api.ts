@@ -4,7 +4,6 @@ import { requestWrapper } from '../index'
 import type {
   BitrixDepartmentRaw,
   TimemanStatusData,
-  TimemanRecord,
   TimemanWorktime,
   TimemanTimecontrolReport,
   TimemanTimecontrolUser,
@@ -23,9 +22,8 @@ import type {
  * ПРИМЕЧАНИЕ: Метод timeman.timecontrol.list НЕ СУЩЕСТВУЕТ в Bitrix24 API.
  * Вместо него используются следующие методы (в порядке приоритета):
  * 0. timeman.timecontrol.reports.get - получение отчетов о времени работы сотрудников (НАИБОЛЕЕ ТОЧНЫЙ)
- * 1. timeman.record.list - получение записей табеля времени (если доступен)
- * 2. timeman.worktime.list - получение записей рабочего времени (если доступен)
- * 3. timeman.status - получение статуса текущего пользователя (работает только для текущего пользователя)
+ * 1. timeman.worktime.list - получение записей рабочего времени (если доступен)
+ * 2. timeman.status - получение статуса текущего пользователя (работает только для текущего пользователя)
  *
  * Документация:
  * - https://apidocs.bitrix24.com/api-reference/timeman/timecontrol/timeman-timecontrol-reports-get.html
@@ -98,7 +96,7 @@ export const fetchTimesheet = async (
       month: filters.month || new Date().getMonth() + 1,
       year: filters.year || new Date().getFullYear(),
       employees: users.map((user) => ({
-        employeeId: user.ID,
+        employeeId: '', // ВРЕМЕННО: закомментировано user.ID
         employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
         employeeCode: `#${user.ID}`,
         entries: {},
@@ -219,81 +217,7 @@ export const fetchTimesheet = async (
     // Пробуем альтернативные методы
   }
 
-  // ПРИОРИТЕТ 1: Пробуем получить данные через timeman.record.list (если доступен)
-  // Этот метод позволяет получить записи табеля времени для всех сотрудников
-  if (timesheetEntries.length === 0) {
-    try {
-      console.log('[Timesheet API] Пробуем получить данные через timeman.record.list...')
-      // ВРЕМЕННО: Фильтруем только пользователя с ID 812
-      const targetUserId = '812'
-      const records = await requestWrapper<TimemanRecord[], TimemanRecord[]>(
-        'timeman.record.list',
-        {
-          filter: {
-            '>=DATE_START': startDateStr,
-            '<=DATE_START': endDateStr,
-            USER_ID: targetUserId,
-          },
-          select: ['ID', 'USER_ID', 'DATE_START', 'DATE_FINISH', 'TIME_START', 'TIME_FINISH', 'DURATION'],
-        },
-        (result) => result
-      )
-
-    if (Array.isArray(records) && records.length > 0) {
-      console.log(`[Timesheet API] Получено ${records.length} записей через timeman.record.list`)
-      records.forEach((record) => {
-        const userId = record.USER_ID
-        const user = users.find((u) => u.ID === userId)
-        if (!user) return
-
-        const dateStart = record.DATE_START || record.DATE_FINISH
-        if (!dateStart) return
-
-        // Определяем дату записи
-        const recordDate = dateStart.split(' ')[0] || dateStart.split('T')[0]
-        if (!recordDate || recordDate < startDateStr || recordDate > endDateStr) return
-
-        // Вычисляем длительность
-        let durationSeconds = 0
-        if (record.DURATION) {
-          // Если DURATION в минутах (обычно так), умножаем на 60
-          durationSeconds = record.DURATION > 10000 ? record.DURATION : record.DURATION * 60
-        } else if (record.TIME_START && record.TIME_FINISH) {
-          // Вычисляем разницу между временем начала и окончания
-          const start = new Date(`${recordDate}T${record.TIME_START}`)
-          const finish = new Date(`${recordDate}T${record.TIME_FINISH}`)
-          if (!isNaN(start.getTime()) && !isNaN(finish.getTime())) {
-            durationSeconds = Math.floor((finish.getTime() - start.getTime()) / 1000)
-          }
-        }
-
-        if (durationSeconds > 0) {
-          const hours = Math.floor(durationSeconds / 3600)
-          const minutes = Math.floor((durationSeconds % 3600) / 60)
-
-          if (hours > 0 || minutes > 0) {
-            timesheetEntries.push({
-              ID: `${userId}_${recordDate}`,
-              EMPLOYEE_ID: userId,
-              EMPLOYEE_NAME: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || userId,
-              EMPLOYEE_CODE: `#${userId}`,
-              DATE: recordDate,
-              HOURS: hours,
-              MINUTES: minutes,
-            })
-          }
-        }
-      })
-    } else {
-      console.log('[Timesheet API] timeman.record.list вернул пустой результат')
-    }
-    } catch (error) {
-      console.warn('[Timesheet API] Не удалось получить данные через timeman.record.list:', error)
-      // Пробуем альтернативный метод
-    }
-  }
-
-  // ПРИОРИТЕТ 2: Если не получили данные через предыдущие методы, пробуем timeman.worktime.list
+  // ПРИОРИТЕТ 1: Если не получили данные через предыдущие методы, пробуем timeman.worktime.list
   if (timesheetEntries.length === 0) {
     try {
       console.log('[Timesheet API] Пробуем получить данные через timeman.worktime.list...')
@@ -350,7 +274,7 @@ export const fetchTimesheet = async (
     }
   }
 
-  // ПРИОРИТЕТ 3: Если все еще нет данных, пробуем получить данные для каждого пользователя через timeman.status
+  // ПРИОРИТЕТ 2: Если все еще нет данных, пробуем получить данные для каждого пользователя через timeman.status
   // (работает только для текущего пользователя или требует прав администратора)
   if (timesheetEntries.length === 0) {
     try {
@@ -424,7 +348,7 @@ export const fetchTimesheet = async (
   } else {
     console.warn('[Timesheet API] ⚠ Не удалось получить данные о времени работы через доступные методы API')
     console.warn('[Timesheet API] Возможные причины:')
-    console.warn('[Timesheet API] 1. Методы timeman.record.list и timeman.worktime.list недоступны на вашем портале')
+    console.warn('[Timesheet API] 1. Метод timeman.worktime.list недоступен на вашем портале')
     console.warn('[Timesheet API] 2. Недостаточно прав для получения данных о времени работы сотрудников')
     console.warn('[Timesheet API] 3. Учет рабочего времени не настроен на портале')
     console.warn('[Timesheet API] 4. В выбранном периоде нет записей о времени работы')
@@ -442,7 +366,7 @@ export const fetchTimesheet = async (
     month: filters.month || new Date().getMonth() + 1,
     year: filters.year || new Date().getFullYear(),
     employees: users.map((user) => ({
-      employeeId: user.ID,
+      employeeId: '', // ВРЕМЕННО: закомментировано user.ID
       employeeName: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.ID,
       employeeCode: `#${user.ID}`,
       entries: {},
