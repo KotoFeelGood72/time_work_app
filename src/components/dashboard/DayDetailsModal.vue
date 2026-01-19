@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { fetchTasks } from '@/api/tasks/api'
 import type { Task } from '@/entities/task-entities'
+import { formatTime, formatTotalTime } from '@/utils/timeFormat'
 
 interface TaskWithTime extends Task {
   hours: number
@@ -131,9 +132,7 @@ const loadTasks = async () => {
 }
 
 const formatTaskTime = (hours: number, minutes: number): string => {
-  const h = hours.toString().padStart(2, '0')
-  const m = minutes.toString().padStart(2, '0')
-  return `${h}:${m}`
+  return formatTime({ date: '', hours, minutes })
 }
 
 const formatTotalTaskTime = (): string => {
@@ -143,7 +142,7 @@ const formatTotalTaskTime = (): string => {
   )
   const h = Math.floor(totalMinutes / 60)
   const m = totalMinutes % 60
-  return `${h}:${m.toString().padStart(2, '0')}`
+  return formatTotalTime(h, m)
 }
 
 const getTaskUrl = (taskId: string): string => {

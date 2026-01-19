@@ -2,6 +2,9 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import type { TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
 import { useReportsStore, useReportsStoreRefs } from '@/stores/useReportsStore'
+import { useModalStore, useModalStoreRefs, ModalType } from '@/stores/useModalStore'
+import { formatTime, formatTotalTime } from '@/utils/timeFormat'
+
 import DepartmentModal from '@/components/dashboard/DepartmentModal.vue'
 import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
 import DateSelect from '@/components/dashboard/DateSelect.vue'
@@ -24,13 +27,11 @@ const {
   currentMonth,
   currentYear,
 } = useReportsStoreRefs()
+const { openModal, closeModal } = useModalStore()
+const { modalType } = useModalStoreRefs()
 
-const isDepartmentModalOpen = ref(false)
 const showEmpty = ref(false)
 
-// Пагинация, сортировка и отображение количества записей управляются плагином vue3-datatable
-
-const isDayDetailsModalOpen = ref(false)
 const selectedDayData = ref<{
   employeeId: string
   employeeCode: string
@@ -175,26 +176,6 @@ const getDailyTotal = (date: string): TimeEntry | null => {
   }
 }
 
-const formatTime = (entry: TimeEntry): string => {
-  const hours = entry.hours.toString().padStart(2, '0')
-  const minutes = entry.minutes.toString().padStart(2, '0')
-  return `${hours}:${minutes}`
-}
-
-const formatTotalTime = (hours: number, minutes: number): string => {
-  const totalMinutes = hours * 60 + minutes
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  return `${h}:${m.toString().padStart(2, '0')}`
-}
-
-const openDepartmentModal = () => {
-  isDepartmentModalOpen.value = true
-}
-
-const closeDepartmentModal = () => {
-  isDepartmentModalOpen.value = false
-}
 
 const handleDepartmentSelect = (department: { id: string; name: string }) => {
   reportsStore.setSelectedDepartment(department)
@@ -224,11 +205,11 @@ const openDayDetails = (employee: EmployeeTimeData, date: string) => {
     date,
     timeEntry: timeEntry || undefined,
   }
-  isDayDetailsModalOpen.value = true
+  openModal(ModalType.DAY_DETAILS)
 }
 
 const closeDayDetailsModal = () => {
-  isDayDetailsModalOpen.value = false
+  closeModal(ModalType.DAY_DETAILS)
   selectedDayData.value = null
 }
 
@@ -248,15 +229,9 @@ onMounted(() => {
       <template #actions>
         <div class="flex items-center gap-3">
         <span class="text-sm text-gray-600 dark:text-gray-400">Подразделение:</span>
-        <!-- <button
-          @click="openDepartmentModal"
-          class="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-semibold text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          {{ selectedDepartment?.name || 'ВСЕ ПОДРАЗДЕЛЕНИЯ' }}
-        </button> -->
         <ButtonComponent
           :text="selectedDepartment?.name || 'ВСЕ ПОДРАЗДЕЛЕНИЯ'"
-          @click="openDepartmentModal"
+          @click="openModal(ModalType.DEPARTMENT)"
         />
       </div>
 
@@ -265,11 +240,6 @@ onMounted(() => {
       />
       </template>
     </PageHead>
-
-    <!-- Ошибка -->
-    <div v-if="error" class="text-red-600 dark:text-red-400 mb-4">
-      {{ error }}
-    </div>
 
     <!-- Skeleton Loader -->
     <TableSkeleton
@@ -293,13 +263,13 @@ onMounted(() => {
         :isServerMode="false"
         :pagination="true"
         :sortable="true"
-        pagination-info="Показано {0} по {1} из {2} записей"
+        pagination-info="Показано {0} по {1}"
         skin="bh-table-striped bh-table-hover"
         class="reports-table"
       >
         <!-- Слот для колонки с именем сотрудника -->
         <template #employee="props">
-          <div v-if="(props.value || props.data).isTotalRow" class="px-4 py-3 text-gray-700 dark:text-gray-300 text-sm font-bold">
+          <div v-if="(props.value || props.data).isTotalRow" class="px-3 py-2 text-gray-700 dark:text-gray-300 text-sm font-bold">
             {{ (props.value || props.data).employee?.employeeName || 'ИТОГО' }}
           </div>
           <EmployeeRow v-else :employee="props.value || props.data" />
@@ -329,7 +299,7 @@ onMounted(() => {
         <template #total="props">
           <div
             :class="[
-              'px-2 py-1.5 text-center font-semibold text-xs',
+              'px-2 py-1 text-center font-semibold text-xs',
               (props.value || props.data).isTotalRow
                 ? 'text-gray-900 dark:text-white bg-yellow-100 dark:bg-yellow-900/30 font-bold'
                 : 'text-black dark:text-white'
@@ -361,10 +331,10 @@ onMounted(() => {
     <!-- Модальное окно выбора подразделения -->
      <transition name="slide-top">
        <DepartmentModal
-         :is-open="isDepartmentModalOpen"
+         :is-open="modalType === ModalType.DEPARTMENT"
          :departments="departments"
          :selected-department-id="selectedDepartment?.id"
-         @close="closeDepartmentModal"
+         @close="closeModal(ModalType.DEPARTMENT)"
          @select="handleDepartmentSelect"
        />
      </transition>
@@ -372,7 +342,7 @@ onMounted(() => {
     <!-- Модальное окно деталей дня -->
      <transition name="slide-left">
        <DayDetailsModal
-         :is-open="isDayDetailsModalOpen"
+         :is-open="modalType === ModalType.DAY_DETAILS"
          :employee-id="selectedDayData?.employeeId || ''"
          :employee-code="selectedDayData?.employeeCode || ''"
          :employee-name="selectedDayData?.employeeName || ''"

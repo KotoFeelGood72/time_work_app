@@ -29,6 +29,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { EmployeeTimeData, TimeEntry } from '@/entities/timesheet-entities'
+import { formatTotalTime } from '@/utils/timeFormat'
 import EmployeeRow from './EmployeeRow.vue'
 import DayCell from './DayCell.vue'
 
@@ -48,13 +49,6 @@ const emit = defineEmits<{
 
 const getTimeEntry = (date: string): TimeEntry | null => {
   return props.employee.entries[date] || null
-}
-
-const formatTotalTime = (hours: number, minutes: number): string => {
-  const totalMinutes = hours * 60 + minutes
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  return `${h}:${m.toString().padStart(2, '0')}`
 }
 
 const handleDayClick = (employee: EmployeeTimeData, date: string) => {

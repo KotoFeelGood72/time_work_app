@@ -69,18 +69,6 @@ export interface TimemanWorktime {
   MINUTES?: number
 }
 
-// DTO для записей времени, затраченного на задачи через tasks.elapseditem.getlist
-export interface TaskElapsedItem {
-  ID: string
-  TASK_ID: string
-  USER_ID: string
-  SECONDS?: number // время в секундах
-  MINUTES?: number // время в минутах
-  CREATED_DATE?: string // дата создания записи
-  DATE_START?: string // дата начала работы
-  COMMENT_TEXT?: string
-}
-
 // DTO для отчетов о времени работы через timeman.timecontrol.reports.get
 export interface TimemanTimecontrolReportDay {
   index: string // формат YYYYMMDD

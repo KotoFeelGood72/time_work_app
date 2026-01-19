@@ -25,6 +25,7 @@
 
 <script setup lang="ts">
 import type { TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
+import { formatTime } from '@/utils/timeFormat'
 
 interface Props {
   employee: EmployeeTimeData
@@ -37,12 +38,6 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   click: [employee: EmployeeTimeData, date: string]
 }>()
-
-const formatTime = (entry: TimeEntry): string => {
-  const hours = entry.hours.toString().padStart(2, '0')
-  const minutes = entry.minutes.toString().padStart(2, '0')
-  return `${hours}:${minutes}`
-}
 
 const handleClick = () => {
   emit('click', props.employee, props.date)

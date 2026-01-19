@@ -2,6 +2,7 @@
   import { ref, computed, onMounted, watch } from 'vue'
   import type {  Department, TimeEntry, EmployeeTimeData } from '@/entities/timesheet-entities'
   import { useReportsStore, useReportsStoreRefs } from '@/stores/useReportsStore'
+  import { formatTime, formatTotalTime } from '@/utils/timeFormat'
   import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
   import DateSelect from '@/components/dashboard/DateSelect.vue'
   import EmployeeRow from '@/components/timesheet/EmployeeRow.vue'
@@ -174,19 +175,6 @@
       hours: total.hours,
       minutes: total.minutes,
     }
-  }
-
-  const formatTime = (entry: TimeEntry): string => {
-    const hours = entry.hours.toString().padStart(2, '0')
-    const minutes = entry.minutes.toString().padStart(2, '0')
-    return `${hours}:${minutes}`
-  }
-
-  const formatTotalTime = (hours: number, minutes: number): string => {
-    const totalMinutes = hours * 60 + minutes
-    const h = Math.floor(totalMinutes / 60)
-    const m = totalMinutes % 60
-    return `${h}:${m.toString().padStart(2, '0')}`
   }
 
 

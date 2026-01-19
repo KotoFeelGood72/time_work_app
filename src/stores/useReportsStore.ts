@@ -6,6 +6,7 @@ import type { TimesheetData, Department } from '@/entities/timesheet-entities'
 export const useReportsStore = defineStore('reports', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
+
   const timesheetData = ref<TimesheetData>({
     departmentName: '',
     month: new Date().getMonth() + 1,
