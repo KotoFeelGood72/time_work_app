@@ -7,6 +7,7 @@ import DayDetailsModal from '@/components/dashboard/DayDetailsModal.vue'
 import DateSelect from '@/components/dashboard/DateSelect.vue'
 import EmployeeRow from '@/components/timesheet/EmployeeRow.vue'
 import DayCell from '@/components/timesheet/DayCell.vue'
+import TableSkeleton from '@/components/timesheet/TableSkeleton.vue'
 import PageHead from '@/components/ui/head/PageHead.vue'
 import ButtonComponent from '@/components/ui/buttons/ButtonComponent.vue'
 // @ts-expect-error - типы не экспортируются правильно
@@ -69,7 +70,7 @@ const daysInMonth = computed(() => {
   return days
 })
 
-// Данные для таблицы
+// Данные для таблицы с итоговой строкой
 const tableRows = computed(() => {
   // Проверяем, что есть данные
   if (!timesheetData.value.employees || timesheetData.value.employees.length === 0) {
@@ -81,6 +82,7 @@ const tableRows = computed(() => {
   const rows = timesheetData.value.employees.map((employee) => {
     const row: Record<string, unknown> = {
       ...employee,
+      isTotalRow: false,
     }
 
     // Добавляем поля для каждой колонки дня
@@ -90,6 +92,32 @@ const tableRows = computed(() => {
 
     return row
   })
+
+  // Добавляем итоговую строку в конец
+  // Используем специальные значения для сортировки, чтобы строка всегда была последней
+  const totalRow: Record<string, unknown> = {
+    employee: {
+      employeeName: `ИТОГО: ${timesheetData.value.workingDays} дн.`,
+      employeeCode: 'zzzzzzzzzz', // Для сортировки - всегда в конце
+      employeeId: '__total__',
+      entries: {},
+      totalHours: timesheetData.value.grandTotal.hours,
+      totalMinutes: timesheetData.value.grandTotal.minutes,
+    },
+    isTotalRow: true,
+    totalHours: timesheetData.value.grandTotal.hours,
+    totalMinutes: timesheetData.value.grandTotal.minutes,
+    // Специальные значения для сортировки - всегда последние
+    _sortEmployee: 'zzzzzzzzzz',
+    _sortTotal: 999999999,
+  }
+
+  // Добавляем поля для каждого дня в итоговой строке
+  daysInMonth.value.forEach((day) => {
+    totalRow[`day_${day.date}`] = getDailyTotal(day.date)
+  })
+
+  rows.push(totalRow)
 
   console.log('Table rows prepared:', rows.length, 'employees:', timesheetData.value.employees.length)
   return rows
@@ -238,15 +266,17 @@ onMounted(() => {
       </template>
     </PageHead>
 
-    <!-- Загрузка -->
-    <div v-if="loading" class="text-18 text-black dark:text-white">
-      Загрузка...
-    </div>
-
     <!-- Ошибка -->
     <div v-if="error" class="text-red-600 dark:text-red-400 mb-4">
       {{ error }}
     </div>
+
+    <!-- Skeleton Loader -->
+    <TableSkeleton
+      v-if="loading"
+      :days-count="daysInMonth.length"
+      :rows-count="10"
+    />
 
     <!-- Таблица с vue3-datatable -->
     <div v-if="!loading && !error" class="timesheet-table-wrapper relative bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
@@ -263,12 +293,16 @@ onMounted(() => {
         :isServerMode="false"
         :pagination="true"
         :sortable="true"
+        pagination-info="Показано {0} по {1} из {2} записей"
         skin="bh-table-striped bh-table-hover"
         class="reports-table"
       >
         <!-- Слот для колонки с именем сотрудника -->
         <template #employee="props">
-          <EmployeeRow :employee="props.value || props.data" />
+          <div v-if="(props.value || props.data).isTotalRow" class="px-4 py-3 text-gray-700 dark:text-gray-300 text-sm font-bold">
+            {{ (props.value || props.data).employee?.employeeName || 'ИТОГО' }}
+          </div>
+          <EmployeeRow v-else :employee="props.value || props.data" />
         </template>
 
         <!-- Слоты для колонок дней -->
@@ -277,7 +311,13 @@ onMounted(() => {
           :key="day.date"
           #[`day_${day.date}`]="props"
         >
+          <div v-if="(props.value || props.data).isTotalRow" class="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-sm font-semibold">
+            <div v-if="props.value && typeof props.value === 'object' && 'hours' in props.value">
+              {{ formatTime(props.value as TimeEntry) }}
+            </div>
+          </div>
           <DayCell
+            v-else
             :employee="props.value || props.data"
             :date="day.date"
             :time-entry="(props.value || props.data).entries[day.date] || null"
@@ -287,32 +327,18 @@ onMounted(() => {
 
         <!-- Слот для колонки итого -->
         <template #total="props">
-          <div class="px-2 py-1.5 text-center text-black dark:text-white font-semibold text-xs">
+          <div
+            :class="[
+              'px-2 py-1.5 text-center font-semibold text-xs',
+              (props.value || props.data).isTotalRow
+                ? 'text-gray-900 dark:text-white bg-yellow-100 dark:bg-yellow-900/30 font-bold'
+                : 'text-black dark:text-white'
+            ]"
+          >
             {{ formatTotalTime((props.value || props.data).totalHours, (props.value || props.data).totalMinutes) }}
           </div>
         </template>
       </Vue3Datatable>
-
-      <!-- Итоговая строка -->
-      <div v-if="timesheetData.employees.length > 0" class="total-row bg-gray-50 dark:bg-gray-800 font-bold border-t border-gray-200 dark:border-gray-700">
-        <div class="grid gap-0" :style="{ gridTemplateColumns: `140px repeat(${daysInMonth.length}, 50px) 60px` }">
-          <div class="px-4 py-3 text-gray-700 dark:text-gray-300 text-sm border-r border-gray-200 dark:border-gray-700">
-            ИТОГО: {{ timesheetData.workingDays }} дн.
-          </div>
-          <div
-            v-for="day in daysInMonth"
-            :key="day.date"
-            class="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-sm border-r border-gray-200 dark:border-gray-700"
-          >
-            <div v-if="getDailyTotal(day.date)" class="font-semibold">
-              {{ formatTime(getDailyTotal(day.date)!) }}
-            </div>
-          </div>
-          <div class="px-4 py-3 text-center text-gray-900 dark:text-white text-sm bg-yellow-100 dark:bg-yellow-900/30 font-bold">
-            {{ formatTotalTime(timesheetData.grandTotal.hours, timesheetData.grandTotal.minutes) }}
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Кнопки действий -->
@@ -333,24 +359,28 @@ onMounted(() => {
     </div>
 
     <!-- Модальное окно выбора подразделения -->
-    <DepartmentModal
-      :is-open="isDepartmentModalOpen"
-      :departments="departments"
-      :selected-department-id="selectedDepartment?.id"
-      @close="closeDepartmentModal"
-      @select="handleDepartmentSelect"
-    />
+     <transition name="slide-top">
+       <DepartmentModal
+         :is-open="isDepartmentModalOpen"
+         :departments="departments"
+         :selected-department-id="selectedDepartment?.id"
+         @close="closeDepartmentModal"
+         @select="handleDepartmentSelect"
+       />
+     </transition>
 
     <!-- Модальное окно деталей дня -->
-    <DayDetailsModal
-      :is-open="isDayDetailsModalOpen"
-      :employee-id="selectedDayData?.employeeId || ''"
-      :employee-code="selectedDayData?.employeeCode || ''"
-      :employee-name="selectedDayData?.employeeName || ''"
-      :date="selectedDayData?.date || ''"
-      :time-entry="selectedDayData?.timeEntry"
-      @close="closeDayDetailsModal"
-    />
+     <transition name="slide-left">
+       <DayDetailsModal
+         :is-open="isDayDetailsModalOpen"
+         :employee-id="selectedDayData?.employeeId || ''"
+         :employee-code="selectedDayData?.employeeCode || ''"
+         :employee-name="selectedDayData?.employeeName || ''"
+         :date="selectedDayData?.date || ''"
+         :time-entry="selectedDayData?.timeEntry"
+         @close="closeDayDetailsModal"
+       />
+     </transition>
   </div>
 </template>
 
@@ -365,6 +395,7 @@ onMounted(() => {
 /* Стили для таблицы в стиле GanttChart */
 .timesheet-table-wrapper {
   border: 1px solid rgb(229 231 235);
+  overflow-x: auto;
 }
 
 .dark .timesheet-table-wrapper {
@@ -393,6 +424,20 @@ onMounted(() => {
   color: rgb(209 213 219);
 }
 
+/* Закрепление первой колонки (заголовок) */
+.reports-table :deep(.bh-table-striped thead th:first-child) {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background-color: rgb(249 250 251) !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .reports-table :deep(.bh-table-striped thead th:first-child) {
+  background-color: rgb(31 41 55) !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
+}
+
 .reports-table :deep(.bh-table-striped tbody td) {
   border-bottom: 1px solid rgb(229 231 235);
   border-right: 1px solid rgb(229 231 235);
@@ -405,12 +450,35 @@ onMounted(() => {
   background-color: rgb(17 24 39);
 }
 
+/* Закрепление первой колонки (ячейки) */
+.reports-table :deep(.bh-table-striped tbody td:first-child) {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: white !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody td:first-child) {
+  background-color: rgb(17 24 39) !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
+}
+
 .reports-table :deep(.bh-table-striped tbody tr:nth-child(even) td) {
   background-color: rgb(249 250 251);
 }
 
 .dark .reports-table :deep(.bh-table-striped tbody tr:nth-child(even) td) {
   background-color: rgb(31 41 55);
+}
+
+/* Сохраняем фон для закрепленной колонки в четных строках */
+.reports-table :deep(.bh-table-striped tbody tr:nth-child(even) td:first-child) {
+  background-color: rgb(249 250 251) !important;
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody tr:nth-child(even) td:first-child) {
+  background-color: rgb(31 41 55) !important;
 }
 
 /* При наведении на строку - светлый фон для всех ячеек */
@@ -429,6 +497,83 @@ onMounted(() => {
 
 .dark .reports-table :deep(.bh-table-hover tbody tr:hover td:hover) {
   background-color: rgb(55 65 81) !important;
+}
+
+/* Сохраняем фон для закрепленной колонки при hover */
+.reports-table :deep(.bh-table-hover tbody tr:hover td:first-child) {
+  background-color: rgb(249 250 251) !important;
+}
+
+.dark .reports-table :deep(.bh-table-hover tbody tr:hover td:first-child) {
+  background-color: rgb(31 41 55) !important;
+}
+
+.reports-table :deep(.bh-table-hover tbody tr:hover td:first-child:hover) {
+  background-color: rgb(243 244 246) !important;
+}
+
+.dark .reports-table :deep(.bh-table-hover tbody tr:hover td:first-child:hover) {
+  background-color: rgb(55 65 81) !important;
+}
+
+/* Стили для итоговой строки в таблице */
+.reports-table :deep(.bh-table-striped tbody tr:has(td:first-child:has-text("ИТОГО"))) {
+  background-color: rgb(249 250 251) !important;
+  border-top: 2px solid rgb(229 231 235);
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody tr:has(td:first-child:has-text("ИТОГО"))) {
+  background-color: rgb(31 41 55) !important;
+  border-top-color: rgb(55 65 81);
+}
+
+/* Альтернативный способ - стилизация через последнюю строку */
+.reports-table :deep(.bh-table-striped tbody tr:last-child) {
+  /* border-top: 2px solid rgb(229 231 235); */
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody tr:last-child) {
+  border-top-color: rgb(55 65 81);
+}
+
+/* Стили для ячеек итоговой строки */
+.reports-table :deep(.bh-table-striped tbody tr:last-child td) {
+  background-color: rgb(249 250 251) !important;
+  font-weight: 600;
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody tr:last-child td) {
+  background-color: rgb(31 41 55) !important;
+}
+
+/* Закрепление первой колонки в итоговой строке */
+.reports-table :deep(.bh-table-striped tbody tr:last-child td:first-child) {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: rgb(249 250 251) !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .reports-table :deep(.bh-table-striped tbody tr:last-child td:first-child) {
+  background-color: rgb(31 41 55) !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Отключаем hover для итоговой строки */
+.reports-table :deep(.bh-table-hover tbody tr:last-child:hover td) {
+  background-color: rgb(249 250 251) !important;
+}
+
+.dark .reports-table :deep(.bh-table-hover tbody tr:last-child:hover td) {
+  background-color: rgb(31 41 55) !important;
+}
+
+/* Стили для пагинации с отступами */
+.reports-table :deep(.bh-table-pagination),
+.reports-table :deep([class*="pagination"]) {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 
 .compact-table-wrapper {
@@ -571,5 +716,38 @@ onMounted(() => {
 
 .compact-table-wrapper::-webkit-scrollbar-thumb:hover {
   background: rgb(107 114 128);
+}
+
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: all 0.6s ease;
+}
+
+.slide-left-enter-from,
+.slide-left-leave-to {
+  transform: translateX(100%);
+}
+
+.slide-left-enter-to,
+.slide-left-leave-from {
+  transform: translateX(0);
+}
+
+.slide-top-enter-active,
+.slide-top-leave-active {
+  transition: all 0.3s ease;
+  opacity: 0;
+}
+
+.slide-top-enter-from,
+.slide-top-leave-to {
+  transform: translateY(20%);
+  opacity: 0;
+}
+
+.slide-top-enter-to,
+.slide-top-leave-from {
+  transform: translateY(0);
+  opacity: 1;
 }
 </style>

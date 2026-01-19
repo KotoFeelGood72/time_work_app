@@ -279,7 +279,9 @@
         :isServerMode="false"
         :pagination="true"
         :sortable="true"
+        pagination-info="Показано {0} по {1} из {2} записей"
         skin="bh-table-striped bh-table-hover"
+        class="home-table"
       >
         <!-- Слот для колонки с именем сотрудника -->
         <template #employee="props">
@@ -506,5 +508,12 @@
 
 .compact-table-wrapper::-webkit-scrollbar-thumb:hover {
   background: rgb(107 114 128);
+}
+
+/* Стили для пагинации с отступами */
+.home-table :deep(.bh-table-pagination),
+.home-table :deep([class*="pagination"]) {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 </style>
